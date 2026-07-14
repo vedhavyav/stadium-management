@@ -44,6 +44,11 @@ During the FIFA World Cup 2026, stadiums will host millions of fans from diverse
 
 ### 4.1 Functional Requirements
 
+#### **E. Firebase Role-Based Authentication Portal**
+*   **Secure Authentication**: Standard sign-in / sign-up screens using Firebase Auth.
+*   **Role Setup & Routing**: New users select their role (Fan, Volunteer, or Organizer) during sign-up. Upon logging in, the system automatically retrieves their role and routes them directly to their specific UI dashboard (eliminating the global toggle bar for production access control).
+*   **Session State**: Persistent user session tracking, allowing seamless login preservation and logouts.
+
 #### **A. GenAI-Powered Fan Copilot**
 *   **Multilingual Chat**: Natural language understanding in English, Spanish, French, Portuguese, Arabic, and German.
 *   **Location-Aware Advice**: Calculates walking paths (e.g., "Where is the nearest restroom with the shortest line?").

@@ -6,6 +6,7 @@ export interface UserLocation {
 
 export interface User {
   id: string;
+  email: string;
   name: string;
   role: 'fan' | 'volunteer' | 'organizer';
   status: 'active' | 'inactive' | 'on_break' | 'busy';

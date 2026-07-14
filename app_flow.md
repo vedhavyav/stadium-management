@@ -4,23 +4,25 @@
 ---
 
 ## 1. Application Navigation Tree
-ArenaOS is designed as a single portal with role-based navigation. A top switcher allows users to view the app as a Fan, Volunteer, or Organizer to simulate the entire ecosystem.
+ArenaOS is designed as a secure portal using role-based routing. When a user first opens the application, they must authenticate via the Firebase Auth screen. If they register a new account, they select their role (Fan, Volunteer, or Organizer). The application then routes them directly to their specific dashboard.
 
 ```mermaid
 graph TD
-    Entry[App Entry Portal] --> Switcher{Select Role}
+    Entry[App Entry Portal] --> Auth{Firebase Authentication}
+    Auth -->|Sign In / Retrieve Role| Route{Check Role}
+    Auth -->|Sign Up / Select Role| Route
     
-    Switcher -->|Fan Perspective| FanDashboard[Fan Dashboard]
+    Route -->|Fan| FanDashboard[Fan Dashboard]
     FanDashboard --> FanChat[GenAI Copilot Chat]
     FanDashboard --> FanMap[Interactive Seat & Concession Map]
     FanDashboard --> FanTicket[My Digital Match Ticket]
     
-    Switcher -->|Volunteer Perspective| VolDashboard[Volunteer Dashboard]
+    Route -->|Volunteer| VolDashboard[Volunteer Dashboard]
     VolDashboard --> VolTasks[Task Checklist / Assigned Incidents]
     VolTasks --> VolChat[Protocol Lookup Copilot]
     VolDashboard --> VolReport[Voice/Text Incident Reporting Form]
     
-    Switcher -->|Organizer Perspective| OrgDashboard[Control Room Dashboard]
+    Route -->|Organizer| OrgDashboard[Control Room Dashboard]
     OrgDashboard --> OrgMap[Live Crowd Heatmap & Staff Tracker]
     OrgDashboard --> OrgStats[Live Analytics & Charts]
     OrgDashboard --> OrgIncidents[Incident Log & Dispatch Controller]

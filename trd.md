@@ -4,11 +4,12 @@
 ---
 
 ## 1. System Architecture Overview
-ArenaOS is structured as a client-side heavy single-page application (SPA) with embedded serverless/mock backend endpoints to minimize overhead and remain within the 10 MB repository constraint. It uses a component-based micro-architecture on the frontend and leverages the Google Gemini API for intelligent chat, translation, and task dispatching.
+ArenaOS is structured as a client-side heavy single-page application (SPA) with embedded serverless/mock backend endpoints to minimize overhead and remain within the 10 MB repository constraint. It uses Firebase Authentication for secure role-based access control, a component-based micro-architecture on the frontend, and leverages the Google Gemini API for intelligent chat, translation, and task dispatching.
 
 ```mermaid
 graph TD
-    User[Fan / Volunteer / Organizer] <--> Frontend[React Vite + Tailwind CSS]
+    User[Fan / Volunteer / Organizer] --> Auth{Firebase Auth}
+    Auth -->|Authenticated| Frontend[React Vite + Tailwind CSS]
     Frontend <--> StateController[Local Database / State Manager]
     Frontend <--> GeminiAPI[Google Gemini API / Client SDK]
     StateController <--> MockEngine[Real-Time Simulator for Crowd & Incidents]
@@ -25,7 +26,8 @@ graph TD
 *   **Charts & Visualizations**: **Recharts** (or canvas-based custom drawing) for live crowd distribution and operations metrics.
 *   **Animations**: **Framer Motion** or custom CSS keyframes for smooth, premium transitions.
 
-### 2.2 Backend & GenAI
+### 2.2 Backend, Authentication & GenAI
+*   **Authentication**: **Firebase v10 SDK** (Authentication client library). Authenticates users via Email/Password or credentials, linking account IDs to corresponding user profiles and role tags. If Firebase credentials are not provided, it falls back to a secure mock Firebase Authentication flow for seamless offline testing.
 *   **Client-Side Integration**: The application will connect directly to the Gemini API (`@google/generative-ai` SDK) using secure client-side API configuration or simulated local GenAI processing with standard templates (if API key is omitted by user).
 *   **GenAI Model**: **Gemini 1.5 Flash** (highly responsive, low-latency, and cost-effective for multi-lingual assistance and categorization tasks).
 *   **Logic Engine**: A backend controller that matches incoming security/maintenance incidents to the nearest volunteers using distance algorithms (Manhattan/Euclidean grid matching).

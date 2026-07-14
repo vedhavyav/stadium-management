@@ -11,13 +11,13 @@ The database structure is designed to support real-time querying, crowd simulati
 |      users       |         |    incidents     |         |   incident_logs  |
 +------------------+         +------------------+         +------------------+
 | id (PK)          |<--------| assigned_to_id   |         | id (PK)          |
-| name             |         | reporter_id      |         | incident_id (FK) |
-| role             |         | id (PK)          |         | old_status       |
-| status           |         | title            |         | new_status       |
-| current_location |         | description      |         | changed_at       |
-| language_pref    |         | status           |         +------------------+
-+------------------+         | category         |
-                             | severity         |
+| email            |         | reporter_id      |         | incident_id (FK) |
+| name             |         | id (PK)          |         | old_status       |
+| role             |         | title            |         | new_status       |
+| status           |         | description      |         | changed_at       |
+| current_location |         | status           |         +------------------+
+| language_pref    |         | category         |
++------------------+         | severity         |
                              | coordinates      |
                              | created_at       |
                              +------------------+
@@ -43,6 +43,7 @@ Represents spectators, volunteer staff, and administrators.
 ```typescript
 interface User {
   id: string; // "USR-101"
+  email: string; // "diego@stadium.com"
   name: string;
   role: 'fan' | 'volunteer' | 'organizer';
   status: 'active' | 'inactive' | 'on_break' | 'busy'; // Volunteers status
@@ -119,6 +120,7 @@ The local database state will boot with the following structure:
   "users": [
     {
       "id": "USR-VOL-1",
+      "email": "sarah@stadium.com",
       "name": "Sarah Jenkins",
       "role": "volunteer",
       "status": "active",
@@ -127,6 +129,7 @@ The local database state will boot with the following structure:
     },
     {
       "id": "USR-FAN-1",
+      "email": "diego@stadium.com",
       "name": "Diego Ramirez",
       "role": "fan",
       "status": "active",

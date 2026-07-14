@@ -1,8 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { 
-  User, 
-  Incident, 
-  Facility, 
+  User,Incident, Facility, 
   Gate, 
   ChatMessage, 
   UserLocation 
@@ -21,6 +19,14 @@ import {
   chatWithAI, 
   analyzeIncident 
 } from './utils/gemini';
+import { 
+  signInUser, 
+  signUpUser, 
+  logOutUser, 
+  getCurrentUserProfile, 
+  auth 
+} from './utils/firebase';
+import { onAuthStateChanged } from 'firebase/auth';
 import { 
   Send, 
   AlertTriangle, 
@@ -55,6 +61,17 @@ export default function App() {
   const [gates, setGates] = useState<Gate[]>(INITIAL_GATES);
   const [incidents, setIncidents] = useState<Incident[]>(INITIAL_INCIDENTS);
   
+  // Firebase Auth states
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [authEmail, setAuthEmail] = useState<string>('');
+  const [authPassword, setAuthPassword] = useState<string>('');
+  const [authName, setAuthName] = useState<string>('');
+  const [authRole, setAuthRole] = useState<'fan' | 'volunteer' | 'organizer'>('fan');
+  const [authLang, setAuthLang] = useState<User['languagePref']>('en');
+  const [isSignUpMode, setIsSignUpMode] = useState<boolean>(false);
+  const [authLoading, setAuthLoading] = useState<boolean>(true);
+  const [authError, setAuthError] = useState<string | null>(null);
+  
   // App state controls
   const [apiKey, setApiKey] = useState<string>('');
   const [isApiConfigured, setIsApiConfigured] = useState<boolean>(false);
@@ -88,6 +105,68 @@ export default function App() {
 
   // DOM Refs
   const chatEndRef = useRef<HTMLDivElement>(null);
+
+  // --- Firebase Auth Observer ---
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (fUser) => {
+      setAuthError(null);
+      if (fUser) {
+        const profile = getCurrentUserProfile(fUser.uid, fUser.email || '');
+        setCurrentUser(profile);
+        setRole(profile.role);
+        // If volunteer logs in, sync their volunteer ID
+        if (profile.role === 'volunteer') {
+          setSelectedVolunteerId(profile.id);
+        }
+      } else {
+        setCurrentUser(null);
+      }
+      setAuthLoading(false);
+    });
+    return unsubscribe;
+  }, []);
+
+  // --- Auth Sign In / Sign Up handler ---
+  const handleAuthSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAuthLoading(true);
+    setAuthError(null);
+    try {
+      if (isSignUpMode) {
+        if (!authName.trim()) {
+          throw new Error("Display Name is required.");
+        }
+        await signUpUser(authEmail, authPassword, authName, authRole, authLang);
+      } else {
+        await signInUser(authEmail, authPassword);
+      }
+      // reset forms
+      setAuthEmail('');
+      setAuthPassword('');
+      setAuthName('');
+    } catch (err: any) {
+      console.error(err);
+      let errMsg = err.message || "Authentication failed.";
+      if (err.code === 'auth/invalid-email') errMsg = "Invalid email format.";
+      if (err.code === 'auth/weak-password') errMsg = "Password must be at least 6 characters.";
+      if (err.code === 'auth/wrong-password') errMsg = "Incorrect password.";
+      if (err.code === 'auth/email-already-in-use') errMsg = "This email is already registered.";
+      setAuthError(errMsg);
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+  const handleSignOut = async () => {
+    setAuthLoading(true);
+    try {
+      await logOutUser();
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setAuthLoading(false);
+    }
+  };
 
   // --- Initialize Gemini API Key ---
   const handleSaveApiKey = () => {
@@ -300,6 +379,158 @@ export default function App() {
 
 
 
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-[#0D1117] flex flex-col items-center justify-center text-gray-100 font-sans">
+        <div className="w-16 h-16 rounded-full bg-gradient-to-tr from-pitch-emerald to-pitch-cyan flex items-center justify-center font-bold text-3xl animate-bounce shadow-[0_0_30px_rgba(16,185,129,0.3)]">
+          ⚽
+        </div>
+        <h2 className="mt-6 font-sporty font-bold text-lg tracking-wide animate-pulse">Initializing ArenaOS Secure Portal...</h2>
+        <p className="text-[10px] text-gray-500 uppercase tracking-widest font-semibold mt-1">Connecting Firebase Services</p>
+      </div>
+    );
+  }
+
+  if (!currentUser) {
+    return (
+      <div className="min-h-screen bg-pitch-bg flex items-center justify-center p-4 relative overflow-hidden font-sans">
+        {/* Background Decorative Pitch Lines */}
+        <div className="absolute inset-0 opacity-5 pointer-events-none">
+          <ellipse cx="50%" cy="50%" rx="40%" ry="45%" fill="none" stroke="#FFF" strokeWidth="2" />
+          <line x1="50%" y1="0" x2="50%" y2="100%" stroke="#FFF" strokeWidth="2" />
+        </div>
+
+        <div className="glass-panel w-full max-w-md p-6 md:p-8 rounded-2xl border border-pitch-border shadow-2xl relative z-10 fade-in">
+          <div className="flex flex-col items-center text-center mb-6">
+            <div className="w-12 h-12 rounded-full bg-gradient-to-tr from-pitch-emerald to-pitch-cyan flex items-center justify-center font-bold text-2xl text-black shadow-lg glow-emerald mb-3">
+              ⚽
+            </div>
+            <h1 className="font-sporty font-extrabold text-2xl tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-white via-pitch-emerald to-pitch-cyan">
+              ArenaOS Portal
+            </h1>
+            <p className="text-[10px] text-gray-400 font-semibold tracking-wider uppercase mt-1">
+              FIFA World Cup 2026 Smart Stadium
+            </p>
+          </div>
+
+          {/* Form Switcher */}
+          <div className="flex border-b border-pitch-border pb-3 mb-5 gap-4">
+            <button 
+              onClick={() => { setIsSignUpMode(false); setAuthError(null); }}
+              className={`flex-1 pb-2 text-xs font-bold transition-all border-b-2 ${!isSignUpMode ? 'border-pitch-emerald text-pitch-emerald' : 'border-transparent text-gray-400 hover:text-white'}`}
+            >
+              Sign In
+            </button>
+            <button 
+              onClick={() => { setIsSignUpMode(true); setAuthError(null); }}
+              className={`flex-1 pb-2 text-xs font-bold transition-all border-b-2 ${isSignUpMode ? 'border-pitch-emerald text-pitch-emerald' : 'border-transparent text-gray-400 hover:text-white'}`}
+            >
+              Register Account
+            </button>
+          </div>
+
+          {authError && (
+            <div className="mb-4 p-3 bg-red-950/40 border border-red-900/50 rounded-lg text-xs text-red-400 flex items-center gap-2 slide-up">
+              <AlertTriangle className="w-4 h-4 shrink-0" />
+              <span>{authError}</span>
+            </div>
+          )}
+
+          <form onSubmit={handleAuthSubmit} className="flex flex-col gap-4 text-xs">
+            {isSignUpMode && (
+              <div>
+                <label className="block text-[9px] font-semibold text-gray-400 uppercase mb-1">Display Name</label>
+                <input 
+                  type="text"
+                  placeholder="Diego Ramirez"
+                  value={authName}
+                  onChange={(e) => setAuthName(e.target.value)}
+                  className="w-full bg-slate-900 border border-pitch-border rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-pitch-emerald text-gray-100"
+                  required
+                />
+              </div>
+            )}
+
+            <div>
+              <label className="block text-[9px] font-semibold text-gray-400 uppercase mb-1">Email Address</label>
+              <input 
+                type="email"
+                placeholder="diego@stadium.com"
+                value={authEmail}
+                onChange={(e) => setAuthEmail(e.target.value)}
+                className="w-full bg-slate-900 border border-pitch-border rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-pitch-emerald text-gray-100"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-[9px] font-semibold text-gray-400 uppercase mb-1">Password</label>
+              <input 
+                type="password"
+                placeholder="••••••••"
+                value={authPassword}
+                onChange={(e) => setAuthPassword(e.target.value)}
+                className="w-full bg-slate-900 border border-pitch-border rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-pitch-emerald text-gray-100"
+                required
+              />
+            </div>
+
+            {isSignUpMode && (
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[9px] font-semibold text-gray-400 uppercase mb-1">Choose Role</label>
+                  <select 
+                    value={authRole}
+                    onChange={(e) => setAuthRole(e.target.value as any)}
+                    className="w-full bg-slate-900 border border-pitch-border rounded-lg px-2.5 py-2 text-xs focus:outline-none focus:border-pitch-emerald text-gray-100"
+                  >
+                    <option value="fan">Fan Spectator</option>
+                    <option value="volunteer">Volunteer Staff</option>
+                    <option value="organizer">Command Center</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[9px] font-semibold text-gray-400 uppercase mb-1">Language</label>
+                  <select 
+                    value={authLang}
+                    onChange={(e) => setAuthLang(e.target.value as any)}
+                    className="w-full bg-slate-900 border border-pitch-border rounded-lg px-2.5 py-2 text-xs focus:outline-none focus:border-pitch-emerald text-gray-100"
+                  >
+                    <option value="en">English</option>
+                    <option value="es">Español</option>
+                    <option value="fr">Français</option>
+                    <option value="pt">Português</option>
+                    <option value="de">Deutsch</option>
+                    <option value="ar">العربية</option>
+                  </select>
+                </div>
+              </div>
+            )}
+
+            <button 
+              type="submit"
+              className="w-full bg-pitch-emerald text-black py-2.5 rounded-lg text-xs font-bold hover:bg-pitch-emerald/90 transition-all uppercase mt-2 shadow-lg shadow-pitch-emerald/20"
+            >
+              {isSignUpMode ? 'Register New Profile' : 'Authenticate Credentials'}
+            </button>
+          </form>
+
+          {/* Test credentials tips */}
+          <div className="mt-6 border-t border-pitch-border/50 pt-4 text-[10px] text-gray-400">
+            <span className="font-semibold block text-[10px] text-pitch-gold uppercase mb-1">💡 Pre-seeded testing accounts:</span>
+            <ul className="list-disc pl-4 space-y-1">
+              <li><strong>Fan</strong>: <code className="text-gray-300">diego@stadium.com</code></li>
+              <li><strong>Volunteer</strong>: <code className="text-gray-300">sarah@stadium.com</code></li>
+              <li><strong>Organizer</strong>: <code className="text-gray-300">marcus@stadium.com</code></li>
+            </ul>
+            <p className="mt-2 text-gray-500 font-medium italic">Password for all is <code className="text-gray-400">password</code></p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-pitch-bg text-gray-100 flex flex-col font-sans select-none pb-8">
       {/* --- Global Header --- */}
@@ -318,25 +549,19 @@ export default function App() {
           </div>
         </div>
 
-        {/* --- View Controller Swapper --- */}
-        <div className="flex bg-pitch-card border border-pitch-border rounded-full p-1 max-w-sm">
+        {/* --- Profile Details & Logout --- */}
+        <div className="flex items-center gap-4">
+          <div className="hidden md:flex flex-col text-right">
+            <span className="text-[10px] text-gray-300 font-semibold">{currentUser.name}</span>
+            <span className="text-[10px] font-extrabold text-pitch-emerald uppercase tracking-wider">
+              {currentUser.role === 'fan' ? 'Fan Spectator' : currentUser.role === 'volunteer' ? 'Volunteer Staff' : 'Command Center Organizer'}
+            </span>
+          </div>
           <button 
-            onClick={() => { setRole('fan'); setNavigationPath(null); setSelectedFacility(null); }}
-            className={`px-3 md:px-4 py-1.5 rounded-full text-xs font-bold transition-all ${role === 'fan' ? 'bg-pitch-emerald text-black shadow' : 'text-gray-400 hover:text-white'}`}
+            onClick={handleSignOut}
+            className="px-3 py-1.5 bg-slate-900 border border-pitch-border hover:border-red-900/50 hover:bg-red-950/10 text-gray-300 hover:text-red-400 rounded-lg text-xs font-bold transition-all uppercase"
           >
-            Fan Portal
-          </button>
-          <button 
-            onClick={() => { setRole('volunteer'); setNavigationPath(null); setSelectedFacility(null); }}
-            className={`px-3 md:px-4 py-1.5 rounded-full text-xs font-bold transition-all ${role === 'volunteer' ? 'bg-pitch-emerald text-black shadow' : 'text-gray-400 hover:text-white'}`}
-          >
-            Volunteer Staff
-          </button>
-          <button 
-            onClick={() => { setRole('organizer'); setNavigationPath(null); setSelectedFacility(null); }}
-            className={`px-3 md:px-4 py-1.5 rounded-full text-xs font-bold transition-all ${role === 'organizer' ? 'bg-pitch-emerald text-black shadow' : 'text-gray-400 hover:text-white'}`}
-          >
-            Command Center
+            Sign Out
           </button>
         </div>
 

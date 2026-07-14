@@ -4,6 +4,7 @@ export const INITIAL_USERS: User[] = [
   // Organizers
   {
     id: "USR-ORG-1",
+    email: "marcus@stadium.com",
     name: "Marcus Vance",
     role: "organizer",
     status: "active",
@@ -13,6 +14,7 @@ export const INITIAL_USERS: User[] = [
   // Volunteers
   {
     id: "USR-VOL-1",
+    email: "sarah@stadium.com",
     name: "Sarah Jenkins",
     role: "volunteer",
     status: "active",
@@ -21,6 +23,7 @@ export const INITIAL_USERS: User[] = [
   },
   {
     id: "USR-VOL-2",
+    email: "carlos@stadium.com",
     name: "Carlos Mendez",
     role: "volunteer",
     status: "active",
@@ -29,6 +32,7 @@ export const INITIAL_USERS: User[] = [
   },
   {
     id: "USR-VOL-3",
+    email: "amira@stadium.com",
     name: "Amira Kanaan",
     role: "volunteer",
     status: "on_break",
@@ -37,6 +41,7 @@ export const INITIAL_USERS: User[] = [
   },
   {
     id: "USR-VOL-4",
+    email: "jeanpierre@stadium.com",
     name: "Jean-Pierre Blanc",
     role: "volunteer",
     status: "active",
@@ -46,6 +51,7 @@ export const INITIAL_USERS: User[] = [
   // Fans
   {
     id: "USR-FAN-1",
+    email: "diego@stadium.com",
     name: "Diego Ramirez",
     role: "fan",
     status: "active",
@@ -54,6 +60,7 @@ export const INITIAL_USERS: User[] = [
   },
   {
     id: "USR-FAN-2",
+    email: "emily@stadium.com",
     name: "Emily Watson",
     role: "fan",
     status: "active",

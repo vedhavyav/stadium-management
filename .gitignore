@@ -29,3 +29,9 @@ build/
 # OS metadata
 .DS_Store
 Thumbs.db
+
+# Firebase & Plugins
+.firebase/
+.agents/
+skills-lock.json
+
