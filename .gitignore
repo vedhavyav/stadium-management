@@ -35,3 +35,9 @@ Thumbs.db
 .agents/
 skills-lock.json
 
+# Environment Overrides
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+

@@ -1,3 +1,4 @@
+/// <reference types="vite/client" />
 import { initializeApp } from "firebase/app";
 import { 
   getAuth, 
@@ -8,15 +9,15 @@ import {
 } from "firebase/auth";
 import { User, UserLocation } from "../types";
 
-// Official configuration for project stadium-management-72334
+// Official configuration load from environment variables with fallback fallback
 const firebaseConfig = {
-  projectId: "stadium-management-72334",
-  appId: "1:777494741645:web:6d93df2105acae41c458c4",
-  storageBucket: "stadium-management-72334.firebasestorage.app",
-  apiKey: "AIzaSyCzGjjTxWi6c0eSBsX3ALMEwWgGSTWMYVk",
-  authDomain: "stadium-management-72334.firebaseapp.com",
-  messagingSenderId: "777494741645",
-  measurementId: "G-NN2DPV877Q"
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "stadium-management-72334",
+  appId: import.meta.env.VITE_FIREBASE_APP_ID || "1:777494741645:web:6d93df2105acae41c458c4",
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "stadium-management-72334.firebasestorage.app",
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyCzGjjTxWi6c0eSBsX3ALMEwWgGSTWMYVk",
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "stadium-management-72334.firebaseapp.com",
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "777494741645",
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || "G-NN2DPV877Q"
 };
 
 // Initialize Firebase App & Auth

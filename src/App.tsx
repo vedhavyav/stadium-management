@@ -72,6 +72,12 @@ export default function App() {
   const [authLoading, setAuthLoading] = useState<boolean>(true);
   const [authError, setAuthError] = useState<string | null>(null);
   
+  // GenAI Operations Advisor states
+  const [advisorRecommendation, setAdvisorRecommendation] = useState<string>(
+    "Awaiting operations logs... Click 'Generate AI Advice' below to get real-time recommendations."
+  );
+  const [isAdvisorLoading, setIsAdvisorLoading] = useState<boolean>(false);
+  
   // App state controls
   const [apiKey, setApiKey] = useState<string>('');
   const [isApiConfigured, setIsApiConfigured] = useState<boolean>(false);
@@ -102,6 +108,11 @@ export default function App() {
   const [volunteerCopilotQ, setVolunteerCopilotQ] = useState<string>('');
   const [volunteerCopilotAns, setVolunteerCopilotAns] = useState<string>('');
   const [isVolCopilotTyping, setIsVolCopilotTyping] = useState<boolean>(false);
+
+  // GenAI Volunteer Translation states
+  const [volunteerTranslateInput, setVolunteerTranslateInput] = useState<string>('');
+  const [volunteerTranslateOutput, setVolunteerTranslateOutput] = useState<string>('');
+  const [isTranslating, setIsTranslating] = useState<boolean>(false);
 
   // DOM Refs
   const chatEndRef = useRef<HTMLDivElement>(null);
@@ -313,6 +324,61 @@ export default function App() {
     }
   };
 
+  // --- GenAI Operations Advisor Logic ---
+  const handleGenerateAIAdvice = async () => {
+    setIsAdvisorLoading(true);
+    setAdvisorRecommendation("Analyzing live stadium data feed...");
+    
+    const unresolvedIncidents = incidents.filter(inc => inc.status !== 'resolved');
+    const congestedGates = gates.filter(g => g.status === 'congested');
+    const longestWaitFac = [...facilities].sort((a, b) => b.waitTimeMins - a.waitTimeMins)[0];
+    
+    const operationalLogs = `
+      - Unresolved Incidents: ${unresolvedIncidents.length} (${unresolvedIncidents.map(i => `${i.title} [${i.severity}]`).join(', ') || 'None'})
+      - Congested Gates: ${congestedGates.length} (${congestedGates.map(g => g.name).join(', ') || 'None'})
+      - Facility Bottleneck: ${longestWaitFac ? `${longestWaitFac.name} at ${longestWaitFac.waitTimeMins} mins` : 'None'}
+      - Active Volunteers: ${users.filter(u => u.role === 'volunteer' && u.status === 'active').length}
+    `;
+
+    try {
+      if (isApiConfigured) {
+        const response = await chatWithAI(
+          `System Role: You are the Lead Operations Director AI for the FIFA 2026 World Cup at Estadio Azteca. 
+          Provide a concise, bulleted operational suggestion list (maximum 3 bullet points, maximum 50 words total) 
+          based on these current stadium conditions:
+          ${operationalLogs}
+          Focus only on critical tasks: volunteer re-routing, crowd flow redirection, and dispatch. Keep it professional and action-oriented.`,
+          [],
+          facilities,
+          gates
+        );
+        setAdvisorRecommendation(response);
+      } else {
+        // Smart Local fallback advice generator based on metrics
+        await new Promise(resolve => setTimeout(resolve, 800)); // simulate AI thinking
+        const recommendations: string[] = [];
+        if (unresolvedIncidents.length > 0) {
+          recommendations.push(`⚠️ Dispatch volunteers to resolve pending incident: ${unresolvedIncidents[0].title}.`);
+        }
+        if (congestedGates.length > 0) {
+          recommendations.push(`🚦 Redirect arriving spectators from ${congestedGates[0].name} to open gates.`);
+        }
+        if (longestWaitFac && longestWaitFac.waitTimeMins > 10) {
+          recommendations.push(`🛒 Redeploy snack-bar queue marshals to assist at ${longestWaitFac.name} (${longestWaitFac.waitTimeMins} min queue).`);
+        }
+        if (recommendations.length === 0) {
+          recommendations.push(`✅ Operations normal. Keep monitoring gates and concession wait times.`);
+        }
+        setAdvisorRecommendation(recommendations.join('\n'));
+      }
+    } catch (err) {
+      console.error(err);
+      setAdvisorRecommendation("Error generating advice. Please check your Gemini API key.");
+    } finally {
+      setIsAdvisorLoading(false);
+    }
+  };
+
   // --- Dispatch Controller (Organizer Actions) ---
   const handleAutoDispatch = (incidentId: string) => {
     const incident = incidents.find(inc => inc.id === incidentId);
@@ -333,6 +399,49 @@ export default function App() {
       alert(`AI System dispatched ${nearestVolunteer.name} to "${incident.title}" (Distance: ${Math.round(calculateDistance(nearestVolunteer.currentLocation, incident.coordinates))}m)`);
     } else {
       alert("No available volunteers at the moment. All active volunteers are currently busy!");
+    }
+  };
+
+  // --- GenAI Volunteer Translation Logic ---
+  const handleTranslateMessage = async () => {
+    if (!volunteerTranslateInput.trim()) return;
+    setIsTranslating(true);
+    setVolunteerTranslateOutput("Translating spectator query...");
+    try {
+      if (isApiConfigured) {
+        const response = await chatWithAI(
+          `System Role: You are a professional translation bot for FIFA 2026 stadium volunteer staff.
+          Translate the following spectator message into English, preserving tone and intent. 
+          Respond with ONLY the translated text:
+          "${volunteerTranslateInput}"`,
+          [],
+          facilities,
+          gates
+        );
+        setVolunteerTranslateOutput(response);
+      } else {
+        // Smart Local keyword translator
+        await new Promise(resolve => setTimeout(resolve, 600)); // simulate thinking
+        const text = volunteerTranslateInput.toLowerCase();
+        let translation = "Could not translate. Using fallback: ";
+        if (text.includes('agua') || text.includes('fuite') || text.includes('water') || text.includes('leak')) {
+          translation = "Translated from Spanish/French: 'There is a water leak / wet area nearby.'";
+        } else if (text.includes('baño') || text.includes('toilette') || text.includes('restroom') || text.includes('wc')) {
+          translation = "Translated from Spanish/French: 'Where is the nearest restroom/toilet?'";
+        } else if (text.includes('médico') || text.includes('medecin') || text.includes('hurt') || text.includes('fainted')) {
+          translation = "Translated from Spanish/French: 'Medical assistance is requested. Someone is injured or unwell.'";
+        } else if (text.includes('pelea') || text.includes('dispute') || text.includes('fight')) {
+          translation = "Translated from Spanish/French: 'Security concern. Spectators are arguing/fighting.'";
+        } else {
+          translation = `Translated from foreign spectator language: "${volunteerTranslateInput}"`;
+        }
+        setVolunteerTranslateOutput(translation);
+      }
+    } catch (err) {
+      console.error(err);
+      setVolunteerTranslateOutput("Translation failed. Please check your Gemini configuration.");
+    } finally {
+      setIsTranslating(false);
     }
   };
 
@@ -395,9 +504,11 @@ export default function App() {
     return (
       <div className="min-h-screen bg-pitch-bg flex items-center justify-center p-4 relative overflow-hidden font-sans">
         {/* Background Decorative Pitch Lines */}
-        <div className="absolute inset-0 opacity-5 pointer-events-none">
-          <ellipse cx="50%" cy="50%" rx="40%" ry="45%" fill="none" stroke="#FFF" strokeWidth="2" />
-          <line x1="50%" y1="0" x2="50%" y2="100%" stroke="#FFF" strokeWidth="2" />
+        <div className="absolute inset-0 opacity-5 pointer-events-none flex items-center justify-center">
+          <svg className="w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
+            <ellipse cx="50" cy="50" rx="40" ry="45" fill="none" stroke="#FFF" strokeWidth="1" />
+            <line x1="50" y1="0" x2="50" y2="100" stroke="#FFF" strokeWidth="1" />
+          </svg>
         </div>
 
         <div className="glass-panel w-full max-w-md p-6 md:p-8 rounded-2xl border border-pitch-border shadow-2xl relative z-10 fade-in">
@@ -571,6 +682,7 @@ export default function App() {
             onClick={() => setShowApiModal(!showApiModal)}
             className={`p-2 rounded-full border transition-all ${isApiConfigured ? 'border-pitch-emerald bg-pitch-emerald/10 text-pitch-emerald' : 'border-pitch-border hover:bg-white/5 text-gray-400'}`}
             title="Configure Gemini API Key"
+            aria-label="Configure Gemini API Key"
           >
             <Key className="w-4.5 h-4.5" />
           </button>
@@ -665,7 +777,10 @@ export default function App() {
               <svg 
                 viewBox="0 0 100 100" 
                 className="w-full max-w-[480px] h-auto drop-shadow-[0_10px_30px_rgba(0,0,0,0.6)]"
+                role="img"
+                aria-label="Interactive visual layout map of the stadium"
               >
+                <title>Stadium Interactive Map</title>
                 {/* Outer Stadium Perimeter Ring */}
                 <ellipse cx="50" cy="50" rx="46" ry="42" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="8" />
                 <ellipse cx="50" cy="50" rx="46" ry="42" fill="none" stroke="rgba(6,182,212,0.15)" strokeWidth="1" />
@@ -712,7 +827,14 @@ export default function App() {
                   if (g.status === 'closed') gateColor = '#EF4444';
 
                   return (
-                    <g key={g.id} className="cursor-pointer" onClick={() => setSelectedFacility(null)}>
+                    <g 
+                      key={g.id} 
+                      className="cursor-pointer" 
+                      onClick={() => setSelectedFacility(null)}
+                      role="button"
+                      aria-label={`${g.name}. Status: ${g.status}`}
+                    >
+                      <title>{g.name} ({g.status})</title>
                       <circle cx={g.coordinates.x} cy={g.coordinates.y} r="2.8" fill={gateColor} opacity="0.8" />
                       <circle cx={g.coordinates.x} cy={g.coordinates.y} r="1.5" fill="#0D1117" />
                       <text x={g.coordinates.x} y={g.coordinates.y - 4} fill="#F3F4F6" fontSize="2.2" fontWeight="bold" textAnchor="middle">
@@ -736,7 +858,10 @@ export default function App() {
                       key={f.id} 
                       className="cursor-pointer" 
                       onClick={(e) => { e.stopPropagation(); setSelectedFacility(f); }}
+                      role="button"
+                      aria-label={`${f.name}. Queue wait time: ${f.waitTimeMins} minutes`}
                     >
+                      <title>{f.name} - Wait: {f.waitTimeMins} mins</title>
                       {isHighlighted && (
                         <circle cx={f.coordinates.x} cy={f.coordinates.y} r="5" fill="none" stroke="#F59E0B" strokeWidth="0.8" className="pulse-path-node" />
                       )}
@@ -778,7 +903,10 @@ export default function App() {
                       key={inc.id} 
                       className="cursor-pointer"
                       onClick={(e) => { e.stopPropagation(); setSelectedIncident(inc); }}
+                      role="button"
+                      aria-label={`Incident reported: ${inc.title}. Severity: ${inc.severity}`}
                     >
+                      <title>Incident Alert: {inc.title} ({inc.severity})</title>
                       <circle cx={inc.coordinates.x} cy={inc.coordinates.y} r="3.2" fill={color} className="pulse-error" />
                       <circle cx={inc.coordinates.x} cy={inc.coordinates.y} r="1.5" fill="#FFF" />
                       <text x={inc.coordinates.x} y={inc.coordinates.y - 4} fill="#FDA4AF" fontSize="2.2" fontWeight="bold" textAnchor="middle">
@@ -1053,6 +1181,7 @@ export default function App() {
                   <button 
                     onClick={() => handleSendFanMessage()}
                     className="p-2 bg-pitch-emerald text-black rounded-xl hover:bg-pitch-emerald/90 transition-all shadow-md flex items-center justify-center"
+                    aria-label="Send message"
                   >
                     <Send className="w-4 h-4" />
                   </button>
@@ -1194,6 +1323,45 @@ export default function App() {
                 </div>
               </div>
 
+              {/* GenAI Translation & Summary Assistant */}
+              <div className="glass-panel p-4 rounded-xl border border-pitch-cyan/30 flex flex-col gap-3">
+                <h3 className="font-sporty font-bold text-xs uppercase tracking-wider text-pitch-cyan flex items-center gap-1.5">
+                  ✨ Spectator Query Translator
+                </h3>
+                <p className="text-[10px] text-gray-400">
+                  Translate queries from non-English speaking spectators (e.g., Spanish, French) instantly to coordinate assistance.
+                </p>
+
+                <div className="flex flex-col gap-3">
+                  <div className="flex items-center gap-2">
+                    <input 
+                      type="text" 
+                      placeholder="e.g., '¿Dónde está el baño más cercano?' or 'Il y a une fuite d'eau'"
+                      value={volunteerTranslateInput}
+                      onChange={(e) => setVolunteerTranslateInput(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && handleTranslateMessage()}
+                      className="flex-1 bg-slate-900 border border-pitch-border rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:border-pitch-cyan text-gray-100 placeholder:text-gray-500"
+                      aria-label="Spectator query to translate"
+                    />
+                    <button 
+                      type="button"
+                      onClick={handleTranslateMessage}
+                      className="px-3 py-1.5 bg-pitch-cyan text-black font-bold rounded-lg text-xs hover:bg-pitch-cyan/90 transition-all uppercase"
+                      disabled={isTranslating}
+                    >
+                      {isTranslating ? '...' : 'Translate'}
+                    </button>
+                  </div>
+
+                  {volunteerTranslateOutput && (
+                    <div className="p-3 bg-slate-900/60 border border-pitch-border rounded-lg text-xs leading-relaxed text-gray-300">
+                      <span className="font-bold text-pitch-cyan text-[10px] block uppercase mb-1">Translation Result</span>
+                      {volunteerTranslateOutput}
+                    </div>
+                  )}
+                </div>
+              </div>
+
               {/* Reporting Incident Form */}
               <form onSubmit={handleReportIncident} className="glass-panel p-4 rounded-xl border border-pitch-border flex flex-col gap-3">
                 <h3 className="font-sporty font-bold text-xs uppercase tracking-wider text-pitch-error flex items-center gap-1.5">
@@ -1230,11 +1398,34 @@ export default function App() {
           {role === 'organizer' && (
             <div className="flex flex-col gap-6 fade-in">
               
+              {/* GenAI Operations Advisor Widget */}
+              <div className="glass-panel p-4 rounded-xl border border-pitch-emerald/30 shadow-[0_0_15px_rgba(16,185,129,0.1)] flex flex-col gap-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 rounded-full bg-pitch-emerald/20 flex items-center justify-center text-pitch-emerald text-xs">
+                      ✨
+                    </div>
+                    <h3 className="font-sporty font-bold text-xs uppercase tracking-wider text-pitch-emerald">GenAI Operations Advisor</h3>
+                  </div>
+                  <button
+                    onClick={handleGenerateAIAdvice}
+                    disabled={isAdvisorLoading}
+                    className={`px-3 py-1 bg-pitch-emerald text-black text-[11px] font-bold rounded-lg hover:bg-pitch-emerald/90 transition-all uppercase ${isAdvisorLoading ? 'animate-pulse opacity-60' : ''}`}
+                    aria-label="Generate AI Advice"
+                  >
+                    {isAdvisorLoading ? 'Analyzing...' : 'Generate Advice'}
+                  </button>
+                </div>
+                <div className="bg-slate-950/60 rounded-lg p-3 border border-pitch-border/50 text-xs text-gray-200 leading-relaxed whitespace-pre-line">
+                  {advisorRecommendation}
+                </div>
+              </div>
+
               {/* Analytics metrics grid */}
               <div className="grid grid-cols-2 gap-4">
                 <div className="glass-panel p-3.5 rounded-xl flex items-center justify-between">
                   <div>
-                    <span className="text-[9px] text-gray-500 block uppercase font-bold">Incidents Logged</span>
+                    <span className="text-xs text-gray-300 block uppercase font-bold">Incidents Logged</span>
                     <span className="text-xl font-extrabold font-sporty text-pitch-emerald">{incidents.length}</span>
                   </div>
                   <AlertTriangle className="w-8 h-8 text-pitch-gold opacity-30" />
@@ -1242,7 +1433,7 @@ export default function App() {
 
                 <div className="glass-panel p-3.5 rounded-xl flex items-center justify-between">
                   <div>
-                    <span className="text-[9px] text-gray-500 block uppercase font-bold">Unresolved Logs</span>
+                    <span className="text-xs text-gray-300 block uppercase font-bold">Unresolved Logs</span>
                     <span className="text-xl font-extrabold font-sporty text-pitch-error">
                       {incidents.filter(inc => inc.status !== 'resolved').length}
                     </span>
@@ -1252,7 +1443,7 @@ export default function App() {
 
                 <div className="glass-panel p-3.5 rounded-xl flex items-center justify-between">
                   <div>
-                    <span className="text-[9px] text-gray-500 block uppercase font-bold">Avg Wait Time</span>
+                    <span className="text-xs text-gray-300 block uppercase font-bold">Avg Wait Time</span>
                     <span className="text-xl font-extrabold font-sporty text-pitch-cyan">
                       {Math.round(facilities.reduce((sum, f) => sum + f.waitTimeMins, 0) / facilities.length)}m
                     </span>
@@ -1262,7 +1453,7 @@ export default function App() {
 
                 <div className="glass-panel p-3.5 rounded-xl flex items-center justify-between">
                   <div>
-                    <span className="text-[9px] text-gray-500 block uppercase font-bold">Active Staff</span>
+                    <span className="text-xs text-gray-300 block uppercase font-bold">Active Staff</span>
                     <span className="text-xl font-extrabold font-sporty text-white">
                       {users.filter(u => u.role === 'volunteer' && u.status === 'active').length}
                     </span>
