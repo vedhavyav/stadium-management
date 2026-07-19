@@ -9,16 +9,20 @@ import {
 } from "firebase/auth";
 import { User, UserLocation } from "../types";
 
-// Official configuration load from environment variables with fallback fallback
+// Official configuration load from environment variables
 const firebaseConfig = {
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "stadium-management-72334",
-  appId: import.meta.env.VITE_FIREBASE_APP_ID || "1:777494741645:web:6d93df2105acae41c458c4",
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "stadium-management-72334.firebasestorage.app",
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyCzGjjTxWi6c0eSBsX3ALMEwWgGSTWMYVk",
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "stadium-management-72334.firebaseapp.com",
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "777494741645",
-  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || "G-NN2DPV877Q"
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "",
+  appId: import.meta.env.VITE_FIREBASE_APP_ID || "",
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "",
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "",
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "",
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "",
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || ""
 };
+
+if (!firebaseConfig.apiKey) {
+  console.warn("Firebase VITE_FIREBASE_API_KEY is missing from environment. Using local client auth mockups.");
+}
 
 // Initialize Firebase App & Auth
 const app = initializeApp(firebaseConfig);

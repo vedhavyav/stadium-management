@@ -1,5 +1,9 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { Facility, Gate, Incident } from '../types';
+import { sanitizeInput, ClientRateLimiter } from './security';
+
+// Client-side rate limiter allowing max 10 requests per minute
+export const apiRateLimiter = new ClientRateLimiter(10, 60000);
 
 // Let the application read the API key from environment variables or a text input in the UI
 let genAIInstance: GoogleGenerativeAI | null = null;
@@ -28,6 +32,17 @@ export async function chatWithAI(
   facilities: Facility[],
   gates: Gate[]
 ): Promise<string> {
+  // 1. Sanitize user input for XSS safety
+  const cleanMessage = sanitizeInput(userMessage);
+  if (!cleanMessage) {
+    return "Message contains invalid elements. Please input clean text.";
+  }
+
+  // 2. Client-side Rate Limiting (only when calling live GenAIInstance)
+  if (genAIInstance && !apiRateLimiter.allowRequest()) {
+    return `Too many requests! I am rate-limiting you to prevent API abuse. Please wait ${apiRateLimiter.getCooldownSeconds()} seconds before asking another question.`;
+  }
+
   const languagePrompt = "Detect the input language and reply in the exact same language (e.g. Spanish, French, Arabic, English).";
   const facilitiesSummary = facilities
     .map(f => `- ${f.name} (${f.type}): Wait time ${f.waitTimeMins} mins, Status: ${f.status}, Coordinates: x=${f.coordinates.x}, y=${f.coordinates.y}`)
@@ -71,18 +86,18 @@ GUIDELINES:
         history: formattedHistory,
       });
 
-      const result = await chatSession.sendMessage(userMessage);
+      const result = await chatSession.sendMessage(cleanMessage);
       const text = result.response.text();
       return text.trim();
     } catch (error) {
       console.error("Gemini API Error, falling back to Local AI:", error);
-      return getLocalMockAIResponse(userMessage, facilities, gates);
+      return getLocalMockAIResponse(cleanMessage, facilities, gates);
     }
   } else {
     // Return local mock response
     return new Promise((resolve) => {
       setTimeout(() => {
-        resolve(getLocalMockAIResponse(userMessage, facilities, gates));
+        resolve(getLocalMockAIResponse(cleanMessage, facilities, gates));
       }, 800); // simulate network latency
     });
   }
@@ -94,6 +109,16 @@ GUIDELINES:
 export async function analyzeIncident(
   rawText: string
 ): Promise<{ title: string; category: Incident['category']; severity: Incident['severity']; description: string }> {
+  // 1. Sanitize raw text input to prevent injection
+  const cleanText = sanitizeInput(rawText);
+  if (!cleanText) {
+    throw new Error("Incident report contains invalid elements. Please input clean text.");
+  }
+
+  // 2. Client-side Rate Limiting (only when calling live GenAIInstance)
+  if (genAIInstance && !apiRateLimiter.allowRequest()) {
+    throw new Error(`Rate limit exceeded. Please wait ${apiRateLimiter.getCooldownSeconds()} seconds before submitting another incident.`);
+  }
   
   const systemInstruction = `
 You are an operational incident classifier for ArenaOS stadium management.
@@ -124,7 +149,7 @@ Schema:
         systemInstruction: systemInstruction,
       });
 
-      const result = await model.generateContent(rawText);
+      const result = await model.generateContent(cleanText);
       const text = result.response.text();
       
       // Clean JSON formatting
@@ -132,12 +157,12 @@ Schema:
       return JSON.parse(cleanJson);
     } catch (error) {
       console.error("Gemini analysis failed, falling back to Local parser:", error);
-      return parseIncidentLocally(rawText);
+      return parseIncidentLocally(cleanText);
     }
   } else {
     return new Promise((resolve) => {
       setTimeout(() => {
-        resolve(parseIncidentLocally(rawText));
+        resolve(parseIncidentLocally(cleanText));
       }, 600);
     });
   }

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { 
   User,Incident, Facility, 
   Gate, 
@@ -27,7 +27,8 @@ import {
   auth 
 } from './utils/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
-import { 
+import { SUPPORTED_LANGUAGES, getLanguageLabel } from './utils/lang';
+import {
   Send, 
   AlertTriangle, 
   CheckCircle, 
@@ -190,6 +191,8 @@ export default function App() {
   useEffect(() => {
     if (!simActive) return;
     const interval = setInterval(() => {
+      // Pause updates if page is not active (Page Visibility API)
+      if (document.hidden) return;
       const { facilities: nextF, gates: nextG } = simulateStadiumChanges(facilities, gates);
       setFacilities(nextF);
       setGates(nextG);
@@ -208,51 +211,46 @@ export default function App() {
     inc => inc.assignedToId === currentVolunteer.id && inc.status !== 'resolved'
   );
 
+  // Helper to append a single ChatMessage object to the active fan list
+  const appendChatMessage = useCallback((role: 'user' | 'model', message: string) => {
+    const newMessage: ChatMessage = {
+      id: Math.random().toString(),
+      role,
+      message,
+      timestamp: new Date().toISOString()
+    };
+    setFanChat(prev => [...prev, newMessage]);
+    return newMessage;
+  }, []);
+
   // --- Chat submission handles ---
-  const handleSendFanMessage = async (textToSend?: string) => {
+  const handleSendFanMessage = useCallback(async (textToSend?: string) => {
     const messageText = textToSend || chatInput;
     if (!messageText.trim()) return;
 
     if (!textToSend) setChatInput('');
 
-    const newUserMessage: ChatMessage = {
-      id: Math.random().toString(),
-      role: 'user',
-      message: messageText,
-      timestamp: new Date().toISOString()
-    };
+    const newUserMessage = appendChatMessage('user', messageText);
+    const nextHistory = [...fanChat, newUserMessage].map(h => ({ role: h.role, message: h.message }));
 
-    const nextHistory = [...fanChat, newUserMessage];
-    setFanChat(nextHistory);
     setIsChatTyping(true);
-
     try {
       const response = await chatWithAI(
         messageText,
-        nextHistory.map(h => ({ role: h.role, message: h.message })),
+        nextHistory,
         facilities,
         gates
       );
-
-      setFanChat(prev => [...prev, {
-        id: Math.random().toString(),
-        role: 'model',
-        message: response,
-        timestamp: new Date().toISOString()
-      }]);
+      appendChatMessage('model', response);
     } catch (err) {
-      console.error(err);
+      console.error("Gemini Copilot conversation failure:", err);
     } finally {
       setIsChatTyping(false);
     }
-  };
+  }, [chatInput, fanChat, facilities, gates, appendChatMessage]);
 
-  // --- Volunteer quick protocol Q&A ---
-  const handleSendVolunteerCopilot = async (textToSend: string) => {
-    if (!textToSend.trim()) return;
-    setVolunteerCopilotQ(textToSend);
-    setIsVolCopilotTyping(true);
-
+  // Helper utility to fetch volunteer stadium policy/rules answers from fallback or Gemini
+  const fetchVolunteerProtocolAnswer = useCallback(async (question: string) => {
     const protocolDocsPrompt = `
       You are the ArenaOS Staff Protocol Copilot.
       Answer the volunteer's question regarding World Cup stadium protocol.
@@ -263,24 +261,33 @@ export default function App() {
       - Ticket Issues: Send spectator to the nearest ticketing container outside Gate B or D.
       Keep answer very brief (1-2 sentences).
     `;
+    return chatWithAI(
+      `Staff Question: ${question}. Protocol Context: ${protocolDocsPrompt}`,
+      [],
+      facilities,
+      gates
+    );
+  }, [facilities, gates]);
+
+  // --- Volunteer quick protocol Q&A ---
+  const handleSendVolunteerCopilot = useCallback(async (textToSend: string) => {
+    if (!textToSend.trim()) return;
+    setVolunteerCopilotQ(textToSend);
+    setIsVolCopilotTyping(true);
 
     try {
-      const answer = await chatWithAI(
-        `Staff Question: ${textToSend}. Protocol Context: ${protocolDocsPrompt}`,
-        [],
-        facilities,
-        gates
-      );
+      const answer = await fetchVolunteerProtocolAnswer(textToSend);
       setVolunteerCopilotAns(answer);
     } catch (e) {
+      console.error("Volunteer copilot lookup failure:", e);
       setVolunteerCopilotAns("Lost bags must be brought to Zone A medical center. Clear plastic bags only are allowed in the stands.");
     } finally {
       setIsVolCopilotTyping(false);
     }
-  };
+  }, [fetchVolunteerProtocolAnswer]);
 
   // --- Ground-staff incident submission ---
-  const handleReportIncident = async (e: React.FormEvent) => {
+  const handleReportIncident = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
     if (!volunteerReportText.trim()) return;
 
@@ -322,10 +329,10 @@ export default function App() {
     } finally {
       setIsSubmittingReport(false);
     }
-  };
+  }, [volunteerReportText, currentVolunteer, assignedIncident]);
 
   // --- GenAI Operations Advisor Logic ---
-  const handleGenerateAIAdvice = async () => {
+  const handleGenerateAIAdvice = useCallback(async () => {
     setIsAdvisorLoading(true);
     setAdvisorRecommendation("Analyzing live stadium data feed...");
     
@@ -377,10 +384,10 @@ export default function App() {
     } finally {
       setIsAdvisorLoading(false);
     }
-  };
+  }, [incidents, gates, facilities, users, isApiConfigured]);
 
   // --- Dispatch Controller (Organizer Actions) ---
-  const handleAutoDispatch = (incidentId: string) => {
+  const handleAutoDispatch = useCallback((incidentId: string) => {
     const incident = incidents.find(inc => inc.id === incidentId);
     if (!incident) return;
 
@@ -400,10 +407,10 @@ export default function App() {
     } else {
       alert("No available volunteers at the moment. All active volunteers are currently busy!");
     }
-  };
+  }, [incidents, users]);
 
   // --- GenAI Volunteer Translation Logic ---
-  const handleTranslateMessage = async () => {
+  const handleTranslateMessage = useCallback(async () => {
     if (!volunteerTranslateInput.trim()) return;
     setIsTranslating(true);
     setVolunteerTranslateOutput("Translating spectator query...");
@@ -443,7 +450,7 @@ export default function App() {
     } finally {
       setIsTranslating(false);
     }
-  };
+  }, [volunteerTranslateInput, isApiConfigured, facilities, gates]);
 
   // --- Volunteer task controls ---
   const handleUpdateTaskStatus = (incidentId: string, nextStatus: Incident['status']) => {
@@ -480,11 +487,11 @@ export default function App() {
   };
 
   // --- Dashboard Data compilation ---
-  const gateChartData = gates.map(g => ({
+  const gateChartData = useMemo(() => gates.map(g => ({
     name: g.name.replace(" Entrance)", "").replace("Gate ", "Gate "),
     flow: g.flowRateIn,
     status: g.status
-  }));
+  })), [gates]);
 
 
 
@@ -550,38 +557,38 @@ export default function App() {
           <form onSubmit={handleAuthSubmit} className="flex flex-col gap-4 text-xs">
             {isSignUpMode && (
               <div>
-                <label className="block text-[9px] font-semibold text-gray-400 uppercase mb-1">Display Name</label>
+                <label className="block text-[11px] font-semibold text-gray-300 uppercase mb-1">Display Name</label>
                 <input 
                   type="text"
                   placeholder="Diego Ramirez"
                   value={authName}
                   onChange={(e) => setAuthName(e.target.value)}
-                  className="w-full bg-slate-900 border border-pitch-border rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-pitch-emerald text-gray-100"
+                  className="w-full bg-slate-900 border border-pitch-border rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-pitch-emerald focus:ring-2 focus:ring-pitch-emerald text-gray-100"
                   required
                 />
               </div>
             )}
 
             <div>
-              <label className="block text-[9px] font-semibold text-gray-400 uppercase mb-1">Email Address</label>
+              <label className="block text-[11px] font-semibold text-gray-300 uppercase mb-1">Email Address</label>
               <input 
                 type="email"
                 placeholder="diego@stadium.com"
                 value={authEmail}
                 onChange={(e) => setAuthEmail(e.target.value)}
-                className="w-full bg-slate-900 border border-pitch-border rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-pitch-emerald text-gray-100"
+                className="w-full bg-slate-900 border border-pitch-border rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-pitch-emerald focus:ring-2 focus:ring-pitch-emerald text-gray-100"
                 required
               />
             </div>
 
             <div>
-              <label className="block text-[9px] font-semibold text-gray-400 uppercase mb-1">Password</label>
+              <label className="block text-[11px] font-semibold text-gray-300 uppercase mb-1">Password</label>
               <input 
                 type="password"
                 placeholder="••••••••"
                 value={authPassword}
                 onChange={(e) => setAuthPassword(e.target.value)}
-                className="w-full bg-slate-900 border border-pitch-border rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-pitch-emerald text-gray-100"
+                className="w-full bg-slate-900 border border-pitch-border rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-pitch-emerald focus:ring-2 focus:ring-pitch-emerald text-gray-100"
                 required
               />
             </div>
@@ -589,11 +596,11 @@ export default function App() {
             {isSignUpMode && (
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-[9px] font-semibold text-gray-400 uppercase mb-1">Choose Role</label>
+                  <label className="block text-[11px] font-semibold text-gray-300 uppercase mb-1">Choose Role</label>
                   <select 
                     value={authRole}
                     onChange={(e) => setAuthRole(e.target.value as any)}
-                    className="w-full bg-slate-900 border border-pitch-border rounded-lg px-2.5 py-2 text-xs focus:outline-none focus:border-pitch-emerald text-gray-100"
+                    className="w-full bg-slate-900 border border-pitch-border rounded-lg px-2.5 py-2 text-xs focus:outline-none focus:border-pitch-emerald focus:ring-2 focus:ring-pitch-emerald text-gray-100"
                   >
                     <option value="fan">Fan Spectator</option>
                     <option value="volunteer">Volunteer Staff</option>
@@ -602,18 +609,15 @@ export default function App() {
                 </div>
 
                 <div>
-                  <label className="block text-[9px] font-semibold text-gray-400 uppercase mb-1">Language</label>
+                  <label className="block text-[11px] font-semibold text-gray-300 uppercase mb-1">Language</label>
                   <select 
                     value={authLang}
                     onChange={(e) => setAuthLang(e.target.value as any)}
                     className="w-full bg-slate-900 border border-pitch-border rounded-lg px-2.5 py-2 text-xs focus:outline-none focus:border-pitch-emerald text-gray-100"
                   >
-                    <option value="en">English</option>
-                    <option value="es">Español</option>
-                    <option value="fr">Français</option>
-                    <option value="pt">Português</option>
-                    <option value="de">Deutsch</option>
-                    <option value="ar">العربية</option>
+                    {SUPPORTED_LANGUAGES.map(lang => (
+                      <option key={lang.code} value={lang.code}>{lang.name}</option>
+                    ))}
                   </select>
                 </div>
               </div>
@@ -644,6 +648,13 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-pitch-bg text-gray-100 flex flex-col font-sans select-none pb-8">
+      {/* Skip Navigation Link for Accessibility */}
+      <a 
+        href="#main-content" 
+        className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 bg-pitch-emerald text-black px-4 py-2 rounded-lg font-bold z-[100] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-pitch-emerald"
+      >
+        Skip to main content
+      </a>
       {/* --- Global Header --- */}
       <header className="border-b border-pitch-border bg-slate-950/70 backdrop-blur-md sticky top-0 z-50 px-4 md:px-8 py-3 flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -746,7 +757,7 @@ export default function App() {
       )}
 
       {/* --- Main Dashboard Container --- */}
-      <main className="flex-1 w-full max-w-[1600px] mx-auto p-4 grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+      <main id="main-content" className="flex-1 w-full max-w-[1600px] mx-auto p-4 grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         
         {/* --- LEFT HAND SIDE: MAP DISPLAY & DETAILS (8 cols) --- */}
         <section className="lg:col-span-7 flex flex-col gap-6 w-full">
@@ -1061,15 +1072,15 @@ export default function App() {
                 
                 <div className="grid grid-cols-3 gap-2 mt-4 text-xs">
                   <div>
-                    <span className="text-[9px] text-gray-500 block uppercase font-bold">Holder</span>
+                    <span className="text-[11px] text-gray-300 block uppercase font-bold">Holder</span>
                     <span className="font-semibold">Diego Ramirez</span>
                   </div>
                   <div>
-                    <span className="text-[9px] text-gray-500 block uppercase font-bold">Section</span>
+                    <span className="text-[11px] text-gray-300 block uppercase font-bold">Section</span>
                     <span className="font-semibold text-pitch-cyan">Sec 104</span>
                   </div>
                   <div>
-                    <span className="text-[9px] text-gray-500 block uppercase font-bold">Gate</span>
+                    <span className="text-[11px] text-gray-300 block uppercase font-bold">Gate</span>
                     <span className="font-semibold text-pitch-gold">Gate B</span>
                   </div>
                 </div>
@@ -1085,7 +1096,7 @@ export default function App() {
                   >
                     <div>
                       <h5 className="text-xs font-bold">Find Restrooms</h5>
-                      <p className="text-[9px] text-gray-500 group-hover:text-gray-300">Locate shortest line</p>
+                      <p className="text-[11px] text-gray-300 group-hover:text-white">Locate shortest line</p>
                     </div>
                     <span className="text-lg">🚻</span>
                   </button>
@@ -1096,7 +1107,7 @@ export default function App() {
                   >
                     <div>
                       <h5 className="text-xs font-bold">Find Tacos / Burgers</h5>
-                      <p className="text-[9px] text-gray-500 group-hover:text-gray-300">Avoid queue bottlenecks</p>
+                      <p className="text-[11px] text-gray-300 group-hover:text-white">Avoid queue bottlenecks</p>
                     </div>
                     <span className="text-lg">🍔</span>
                   </button>
@@ -1112,7 +1123,7 @@ export default function App() {
                     <div className="w-2 h-2 bg-pitch-emerald rounded-full" />
                     <h3 className="font-sporty font-bold text-xs">ArenaOS AI Assistant</h3>
                   </div>
-                  <span className="text-[9px] text-gray-500 uppercase tracking-widest font-semibold">Gemini Copilot</span>
+                  <span className="text-[11px] text-gray-300 uppercase tracking-widest font-semibold">Gemini Copilot</span>
                 </div>
 
                 {/* Chat Message Scroll */}
@@ -1204,7 +1215,7 @@ export default function App() {
                     <UserIcon className="w-4.5 h-4.5" />
                   </div>
                   <div>
-                    <span className="text-[9px] text-gray-400 uppercase font-semibold">Active Volunteer Profile</span>
+                    <span className="text-[11px] text-gray-300 uppercase font-semibold">Active Volunteer Profile</span>
                     <select 
                       value={selectedVolunteerId}
                       onChange={(e) => setSelectedVolunteerId(e.target.value)}
@@ -1212,7 +1223,7 @@ export default function App() {
                     >
                       {users.filter(u => u.role === 'volunteer').map(v => (
                         <option key={v.id} value={v.id} className="bg-slate-950 text-white">
-                          {v.name} ({v.languagePref.toUpperCase()})
+                          {v.name} ({getLanguageLabel(v.languagePref)})
                         </option>
                       ))}
                     </select>

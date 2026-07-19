@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import App from '../App';
 
 // Mock Firebase module to prevent real network logins during compilation tests
@@ -38,7 +38,7 @@ vi.mock('recharts', async (importOriginal) => {
   };
 });
 
-describe('ArenaOS Component Rendering Tests', () => {
+describe('ArenaOS Component Rendering & Interaction Tests', () => {
 
   it('should render the Sign In / Sign Up portal on startup', () => {
     render(<App />);
@@ -53,6 +53,35 @@ describe('ArenaOS Component Rendering Tests', () => {
 
     // Check that preseeded testing details are shown for accessibility
     expect(screen.getByText(/Pre-seeded testing accounts/i)).toBeInTheDocument();
+  });
+
+  it('should toggle input fields when switching between Sign In and Register tabs', () => {
+    render(<App />);
+
+    // Display Name input label should NOT be present on default Sign In tab
+    expect(screen.queryByLabelText(/Display Name/i)).not.toBeInTheDocument();
+
+    // Click "Register Account" tab
+    const registerTabButton = screen.getByRole('button', { name: /Register Account/i });
+    fireEvent.click(registerTabButton);
+
+    // Display Name label should now be present
+    expect(screen.getByText('Display Name')).toBeInTheDocument();
+
+    // Click "Sign In" tab to toggle back
+    const signInTabButton = screen.getByRole('button', { name: /Sign In/i });
+    fireEvent.click(signInTabButton);
+
+    // Display Name label should be hidden again
+    expect(screen.queryByText('Display Name')).not.toBeInTheDocument();
+  });
+
+  it('should update inputs on user typing', () => {
+    render(<App />);
+
+    const emailInput = screen.getByPlaceholderText('diego@stadium.com') as HTMLInputElement;
+    fireEvent.change(emailInput, { target: { value: 'user@test.com' } });
+    expect(emailInput.value).toBe('user@test.com');
   });
 
 });
