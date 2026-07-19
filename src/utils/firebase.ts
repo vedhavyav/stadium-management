@@ -85,30 +85,7 @@ export async function signInUser(email: string, password: string): Promise<User>
     const user = userCredential.user;
     return getCurrentUserProfile(user.uid, user.email || email);
   } catch (error: any) {
-    // Auto-registration trigger:
-    // If it's a seed account and doesn't exist yet in their new Firebase project, register them on-the-fly!
-    if (
-      (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential') &&
-      password === 'password' &&
-      (email === 'diego@stadium.com' || email === 'sarah@stadium.com' || email === 'marcus@stadium.com')
-    ) {
-      console.log(`Predefined user ${email} not found in Firebase Auth console. Registering on-the-fly...`);
-      let role: User['role'] = 'fan';
-      let name = "Diego Ramirez";
-      let lang: User['languagePref'] = 'es';
-
-      if (email === 'sarah@stadium.com') {
-        role = 'volunteer';
-        name = "Sarah Jenkins";
-        lang = 'en';
-      } else if (email === 'marcus@stadium.com') {
-        role = 'organizer';
-        name = "Marcus Vance";
-        lang = 'en';
-      }
-
-      return await signUpUser(email, password, name, role, lang);
-    }
+    // No auto-registration fallback; propagate the error
     throw error;
   }
 }

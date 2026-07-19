@@ -8,7 +8,16 @@
 export function sanitizeInput(text: string): string {
   if (!text) return "";
   // Strip out HTML markup
-  return text.replace(/<[^>]*>/g, "").trim();
+  let clean = text.replace(/<[^>]*>/g, "");
+  // Escape potentially dangerous characters into HTML entity representations
+  clean = clean
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#x27;")
+    .replace(/\//g, "&#x2F;");
+  return clean.trim();
 }
 
 /**

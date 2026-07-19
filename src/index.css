@@ -10,6 +10,20 @@
   }
 }
 
+/* Focus visible style for accessibility */
+.focus-visible:not(:focus-visible) {
+  outline: none;
+}
+.focus-visible:focus-visible {
+  outline: 2px solid #10B981; /* pitch-emerald */
+  outline-offset: 2px;
+}
+
+/* Slightly increase base text size for readability */
+html {
+  font-size: 112.5%; /* 18px base */
+}
+
 /* Glassmorphism Panel styles */
 .glass-panel {
   background: rgba(22, 27, 34, 0.75);

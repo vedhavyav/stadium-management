@@ -14,6 +14,7 @@ import {
   getClosestAvailableVolunteer,
   calculateDistance
 } from './data/mockDb';
+import { FAN_START_LOCATION,DEFAULT_VOLUNTEER_ID} from './constants';
 import { 
   initializeGemini, 
   chatWithAI, 
@@ -27,31 +28,14 @@ import {
   auth 
 } from './utils/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
-import { SUPPORTED_LANGUAGES, getLanguageLabel } from './utils/lang';
 import { MapDisplay } from './components/MapDisplay';
-import {
-  Send, 
-  AlertTriangle, 
-  CheckCircle, 
-  Users, 
-  Clock, 
-  ShieldAlert, 
-  Activity, 
-  User as UserIcon, 
-  Key, 
-  Ticket, 
-  TrendingUp,
-  FileText
-} from 'lucide-react';
-import { 
-  BarChart, 
-  Bar, 
-  XAxis, 
-  YAxis, 
-  Tooltip as ChartTooltip, 
-  ResponsiveContainer, 
-  Cell 
-} from 'recharts';
+import { Header } from './components/Header';
+import { Footer } from './components/Footer';
+import { AuthPortal } from './components/AuthPortal';
+import { FanDashboard } from './components/FanDashboard';
+import { VolunteerDashboard } from './components/VolunteerDashboard';
+import { OrganizerDashboard } from './components/OrganizerDashboard';
+import { Key } from 'lucide-react';
 
 export default function App() {
   // --- State Variables ---
@@ -102,7 +86,7 @@ export default function App() {
   const [navigationPath, setNavigationPath] = useState<{ from: UserLocation; to: { x: number; y: number }; label: string } | null>(null);
 
   // Volunteer Portal State
-  const [selectedVolunteerId, setSelectedVolunteerId] = useState<string>('USR-VOL-2'); // default to Carlos
+  const [selectedVolunteerId, setSelectedVolunteerId] = useState<string>(DEFAULT_VOLUNTEER_ID); // default to Carlos
   const [volunteerReportText, setVolunteerReportText] = useState<string>('');
   const [isSubmittingReport, setIsSubmittingReport] = useState<boolean>(false);
   const [volunteerCopilotQ, setVolunteerCopilotQ] = useState<string>('');
@@ -481,7 +465,7 @@ export default function App() {
     if (matches.length > 0) {
       const best = matches.reduce((best, cur) => cur.waitTimeMins < best.waitTimeMins ? cur : best, matches[0]);
       
-      const fanLocation: UserLocation = { zone: "Section 104", x: 26, y: 35 }; // Diego location
+      const fanLocation: UserLocation = FAN_START_LOCATION; // Diego location
       setNavigationPath({
         from: fanLocation,
         to: best.coordinates,
@@ -517,140 +501,23 @@ export default function App() {
 
   if (!currentUser) {
     return (
-      <div className="min-h-screen bg-pitch-bg flex items-center justify-center p-4 relative overflow-hidden font-sans">
-        {/* Background Decorative Pitch Lines */}
-        <div className="absolute inset-0 opacity-5 pointer-events-none flex items-center justify-center">
-          <svg className="w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
-            <ellipse cx="50" cy="50" rx="40" ry="45" fill="none" stroke="#FFF" strokeWidth="1" />
-            <line x1="50" y1="0" x2="50" y2="100" stroke="#FFF" strokeWidth="1" />
-          </svg>
-        </div>
-
-        <div className="glass-panel w-full max-w-md p-6 md:p-8 rounded-2xl border border-pitch-border shadow-2xl relative z-10 fade-in">
-          <div className="flex flex-col items-center text-center mb-6">
-            <div className="w-12 h-12 rounded-full bg-gradient-to-tr from-pitch-emerald to-pitch-cyan flex items-center justify-center font-bold text-2xl text-black shadow-lg glow-emerald mb-3">
-              ⚽
-            </div>
-            <h1 className="font-sporty font-extrabold text-2xl tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-white via-pitch-emerald to-pitch-cyan">
-              ArenaOS Portal
-            </h1>
-            <p className="text-[10px] text-gray-400 font-semibold tracking-wider uppercase mt-1">
-              FIFA World Cup 2026 Smart Stadium
-            </p>
-          </div>
-
-          {/* Form Switcher */}
-          <div className="flex border-b border-pitch-border pb-3 mb-5 gap-4">
-            <button 
-              onClick={() => { setIsSignUpMode(false); setAuthError(null); }}
-              className={`flex-1 pb-2 text-xs font-bold transition-all border-b-2 ${!isSignUpMode ? 'border-pitch-emerald text-pitch-emerald' : 'border-transparent text-gray-400 hover:text-white'}`}
-            >
-              Sign In
-            </button>
-            <button 
-              onClick={() => { setIsSignUpMode(true); setAuthError(null); }}
-              className={`flex-1 pb-2 text-xs font-bold transition-all border-b-2 ${isSignUpMode ? 'border-pitch-emerald text-pitch-emerald' : 'border-transparent text-gray-400 hover:text-white'}`}
-            >
-              Register Account
-            </button>
-          </div>
-
-          {authError && (
-            <div className="mb-4 p-3 bg-red-950/40 border border-red-900/50 rounded-lg text-xs text-red-400 flex items-center gap-2 slide-up">
-              <AlertTriangle className="w-4 h-4 shrink-0" />
-              <span>{authError}</span>
-            </div>
-          )}
-
-          <form onSubmit={handleAuthSubmit} className="flex flex-col gap-4 text-xs">
-            {isSignUpMode && (
-              <div>
-                <label className="block text-[11px] font-semibold text-gray-300 uppercase mb-1">Display Name</label>
-                <input 
-                  type="text"
-                  placeholder="Diego Ramirez"
-                  value={authName}
-                  onChange={(e) => setAuthName(e.target.value)}
-                  className="w-full bg-slate-900 border border-pitch-border rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-pitch-emerald focus:ring-2 focus:ring-pitch-emerald text-gray-100"
-                  required
-                />
-              </div>
-            )}
-
-            <div>
-              <label className="block text-[11px] font-semibold text-gray-300 uppercase mb-1">Email Address</label>
-              <input 
-                type="email"
-                placeholder="diego@stadium.com"
-                value={authEmail}
-                onChange={(e) => setAuthEmail(e.target.value)}
-                className="w-full bg-slate-900 border border-pitch-border rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-pitch-emerald focus:ring-2 focus:ring-pitch-emerald text-gray-100"
-                required
-              />
-            </div>
-
-            <div>
-              <label className="block text-[11px] font-semibold text-gray-300 uppercase mb-1">Password</label>
-              <input 
-                type="password"
-                placeholder="••••••••"
-                value={authPassword}
-                onChange={(e) => setAuthPassword(e.target.value)}
-                className="w-full bg-slate-900 border border-pitch-border rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-pitch-emerald focus:ring-2 focus:ring-pitch-emerald text-gray-100"
-                required
-              />
-            </div>
-
-            {isSignUpMode && (
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-[11px] font-semibold text-gray-300 uppercase mb-1">Choose Role</label>
-                  <select 
-                    value={authRole}
-                    onChange={(e) => setAuthRole(e.target.value as any)}
-                    className="w-full bg-slate-900 border border-pitch-border rounded-lg px-2.5 py-2 text-xs focus:outline-none focus:border-pitch-emerald focus:ring-2 focus:ring-pitch-emerald text-gray-100"
-                  >
-                    <option value="fan">Fan Spectator</option>
-                    <option value="volunteer">Volunteer Staff</option>
-                    <option value="organizer">Command Center</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-[11px] font-semibold text-gray-300 uppercase mb-1">Language</label>
-                  <select 
-                    value={authLang}
-                    onChange={(e) => setAuthLang(e.target.value as any)}
-                    className="w-full bg-slate-900 border border-pitch-border rounded-lg px-2.5 py-2 text-xs focus:outline-none focus:border-pitch-emerald text-gray-100"
-                  >
-                    {SUPPORTED_LANGUAGES.map(lang => (
-                      <option key={lang.code} value={lang.code}>{lang.name}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-            )}
-
-            <button 
-              type="submit"
-              className="w-full bg-pitch-emerald text-black py-2.5 rounded-lg text-xs font-bold hover:bg-pitch-emerald/90 transition-all uppercase mt-2 shadow-lg shadow-pitch-emerald/20"
-            >
-              {isSignUpMode ? 'Register New Profile' : 'Authenticate Credentials'}
-            </button>
-          </form>
-
-          {/* Test credentials tips */}
-          <div className="mt-6 border-t border-pitch-border/50 pt-4 text-[10px] text-gray-400">
-            <span className="font-semibold block text-[10px] text-pitch-gold uppercase mb-1">💡 Pre-seeded testing accounts:</span>
-            <ul className="list-disc pl-4 space-y-1">
-              <li><strong>Fan</strong>: <code className="text-gray-300">diego@stadium.com</code></li>
-              <li><strong>Volunteer</strong>: <code className="text-gray-300">sarah@stadium.com</code></li>
-              <li><strong>Organizer</strong>: <code className="text-gray-300">marcus@stadium.com</code></li>
-            </ul>
-            <p className="mt-2 text-gray-500 font-medium italic">Password for all is <code className="text-gray-400">password</code></p>
-          </div>
-        </div>
-      </div>
+      <AuthPortal
+        authEmail={authEmail}
+        setAuthEmail={setAuthEmail}
+        authPassword={authPassword}
+        setAuthPassword={setAuthPassword}
+        authName={authName}
+        setAuthName={setAuthName}
+        authRole={authRole}
+        setAuthRole={setAuthRole}
+        authLang={authLang}
+        setAuthLang={setAuthLang}
+        isSignUpMode={isSignUpMode}
+        setIsSignUpMode={setIsSignUpMode}
+        authError={authError}
+        setAuthError={setAuthError}
+        handleAuthSubmit={handleAuthSubmit}
+      />
     );
   }
 
@@ -664,55 +531,13 @@ export default function App() {
         Skip to main content
       </a>
       {/* --- Global Header --- */}
-      <header className="border-b border-pitch-border bg-slate-950/70 backdrop-blur-md sticky top-0 z-50 px-4 md:px-8 py-3 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-pitch-emerald to-pitch-cyan flex items-center justify-center font-bold text-xl text-black shadow-lg">
-            ⚽
-          </div>
-          <div>
-            <h1 className="font-sporty font-extrabold text-lg md:text-xl tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-white via-pitch-emerald to-pitch-cyan">
-              ArenaOS
-            </h1>
-            <p className="text-[10px] text-gray-400 font-semibold tracking-wider uppercase">
-              FIFA World Cup 2026 Operations
-            </p>
-          </div>
-        </div>
-
-        {/* --- Profile Details & Logout --- */}
-        <div className="flex items-center gap-4">
-          <div className="hidden md:flex flex-col text-right">
-            <span className="text-[10px] text-gray-300 font-semibold">{currentUser.name}</span>
-            <span className="text-[10px] font-extrabold text-pitch-emerald uppercase tracking-wider">
-              {currentUser.role === 'fan' ? 'Fan Spectator' : currentUser.role === 'volunteer' ? 'Volunteer Staff' : 'Command Center Organizer'}
-            </span>
-          </div>
-          <button 
-            onClick={handleSignOut}
-            className="px-3 py-1.5 bg-slate-900 border border-pitch-border hover:border-red-900/50 hover:bg-red-950/10 text-gray-300 hover:text-red-400 rounded-lg text-xs font-bold transition-all uppercase"
-          >
-            Sign Out
-          </button>
-        </div>
-
-        {/* --- Gemini configuration widget --- */}
-        <div className="flex items-center gap-2">
-          <button 
-            onClick={() => setShowApiModal(!showApiModal)}
-            className={`p-2 rounded-full border transition-all ${isApiConfigured ? 'border-pitch-emerald bg-pitch-emerald/10 text-pitch-emerald' : 'border-pitch-border hover:bg-white/5 text-gray-400'}`}
-            title="Configure Gemini API Key"
-            aria-label="Configure Gemini API Key"
-          >
-            <Key className="w-4.5 h-4.5" />
-          </button>
-          <div className="hidden md:flex flex-col text-right">
-            <span className="text-[10px] text-gray-400">AI Engine Status</span>
-            <span className={`text-xs font-bold ${isApiConfigured ? 'text-pitch-emerald' : 'text-pitch-gold'}`}>
-              {isApiConfigured ? 'Gemini 1.5 Live' : 'Local Fallback AI'}
-            </span>
-          </div>
-        </div>
-      </header>
+      <Header
+        currentUser={currentUser!}
+        handleSignOut={handleSignOut}
+        showApiModal={showApiModal}
+        setShowApiModal={setShowApiModal}
+        isApiConfigured={isApiConfigured}
+      />
 
       {/* --- API Key Config Modal --- */}
       {showApiModal && (
@@ -795,520 +620,66 @@ export default function App() {
           {/* 1. FAN PORTAL VIEW */}
           {/* ========================================================================= */}
           {role === 'fan' && (
-            <div className="flex flex-col gap-6 fade-in">
-              
-              {/* Ticket Widget */}
-              <div className="glass-panel p-4 rounded-2xl relative overflow-hidden bg-gradient-to-r from-slate-900 to-emerald-950/20 border-l-4 border-pitch-emerald">
-                <div className="absolute right-[-20px] top-[-10px] opacity-10 text-9xl">🎫</div>
-                <div className="flex items-center justify-between mb-3 border-b border-pitch-border pb-2">
-                  <div className="flex items-center gap-1.5 text-pitch-emerald font-bold text-xs uppercase tracking-wider">
-                    <Ticket className="w-4 h-4" /> Match Ticket
-                  </div>
-                  <span className="text-[10px] bg-pitch-emerald/20 text-pitch-emerald px-2 py-0.5 rounded font-bold uppercase">Zone C Entrance</span>
-                </div>
-                
-                <h3 className="font-sporty font-extrabold text-base tracking-wide">MEXICO vs USA</h3>
-                <p className="text-[11px] text-gray-400">FIFA World Cup Group Stage • Estadio Azteca</p>
-                
-                <div className="grid grid-cols-3 gap-2 mt-4 text-xs">
-                  <div>
-                    <span className="text-[11px] text-gray-300 block uppercase font-bold">Holder</span>
-                    <span className="font-semibold">Diego Ramirez</span>
-                  </div>
-                  <div>
-                    <span className="text-[11px] text-gray-300 block uppercase font-bold">Section</span>
-                    <span className="font-semibold text-pitch-cyan">Sec 104</span>
-                  </div>
-                  <div>
-                    <span className="text-[11px] text-gray-300 block uppercase font-bold">Gate</span>
-                    <span className="font-semibold text-pitch-gold">Gate B</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Quick Navigation Chips */}
-              <div className="flex flex-col gap-2">
-                <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Quick Venue Actions</span>
-                <div className="grid grid-cols-2 gap-2">
-                  <button 
-                    onClick={() => handleTriggerQuickNavigation('restroom')}
-                    className="glass-panel p-3 rounded-xl text-left hover:border-pitch-cyan/50 hover:bg-slate-900/60 transition-all flex items-center justify-between group"
-                  >
-                    <div>
-                      <h5 className="text-xs font-bold">Find Restrooms</h5>
-                      <p className="text-[11px] text-gray-300 group-hover:text-white">Locate shortest line</p>
-                    </div>
-                    <span className="text-lg">🚻</span>
-                  </button>
-
-                  <button 
-                    onClick={() => handleTriggerQuickNavigation('concession')}
-                    className="glass-panel p-3 rounded-xl text-left hover:border-pitch-cyan/50 hover:bg-slate-900/60 transition-all flex items-center justify-between group"
-                  >
-                    <div>
-                      <h5 className="text-xs font-bold">Find Tacos / Burgers</h5>
-                      <p className="text-[11px] text-gray-300 group-hover:text-white">Avoid queue bottlenecks</p>
-                    </div>
-                    <span className="text-lg">🍔</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* GenAI Copilot Assistant */}
-              <div className="glass-panel rounded-2xl flex flex-col h-[400px] bg-slate-950/40 relative">
-                
-                {/* Copilot Header */}
-                <div className="px-4 py-3 bg-slate-900/70 border-b border-pitch-border flex items-center justify-between rounded-t-2xl">
-                  <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 bg-pitch-emerald rounded-full" />
-                    <h3 className="font-sporty font-bold text-xs">ArenaOS AI Assistant</h3>
-                  </div>
-                  <span className="text-[11px] text-gray-300 uppercase tracking-widest font-semibold">Gemini Copilot</span>
-                </div>
-
-                {/* Chat Message Scroll */}
-                <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-3">
-                  {fanChat.map((chat) => {
-                    const isModel = chat.role === 'model';
-                    return (
-                      <div 
-                        key={chat.id} 
-                        className={`flex flex-col max-w-[85%] ${isModel ? 'self-start' : 'self-end'}`}
-                      >
-                        <div className={`p-3 rounded-2xl text-xs leading-relaxed ${isModel ? 'bg-slate-900 border border-pitch-border' : 'bg-pitch-emerald text-black font-semibold'}`}>
-                          {chat.message}
-                        </div>
-                        <span className={`text-[8px] text-gray-500 mt-0.5 ${isModel ? 'self-start pl-1' : 'self-end pr-1'}`}>
-                          {new Date(chat.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                        </span>
-                      </div>
-                    );
-                  })}
-                  {isChatTyping && (
-                    <div className="self-start max-w-[85%]">
-                      <div className="bg-slate-900 border border-pitch-border px-4 py-2.5 rounded-2xl text-xs text-gray-400 italic flex items-center gap-1.5">
-                        <span className="w-1.5 h-1.5 rounded-full bg-pitch-emerald animate-bounce" />
-                        <span className="w-1.5 h-1.5 rounded-full bg-pitch-emerald animate-bounce delay-150" />
-                        <span className="w-1.5 h-1.5 rounded-full bg-pitch-emerald animate-bounce delay-300" />
-                        ArenaOS is translating & thinking...
-                      </div>
-                    </div>
-                  )}
-                  <div ref={chatEndRef} />
-                </div>
-
-                {/* Suggestion Chips inside Chat */}
-                <div className="px-3 py-1 flex gap-1.5 overflow-x-auto border-t border-pitch-border/30 bg-slate-950/60 scrollbar-none">
-                  <button 
-                    onClick={() => handleSendFanMessage("Where is Section 104?")}
-                    className="whitespace-nowrap px-2.5 py-1 rounded-full bg-white/5 border border-pitch-border text-[9px] font-medium hover:bg-white/10 hover:border-gray-400 transition-all text-gray-300"
-                  >
-                    📍 Where is Section 104?
-                  </button>
-                  <button 
-                    onClick={() => handleSendFanMessage("What is the bag policy?")}
-                    className="whitespace-nowrap px-2.5 py-1 rounded-full bg-white/5 border border-pitch-border text-[9px] font-medium hover:bg-white/10 hover:border-gray-400 transition-all text-gray-300"
-                  >
-                    💼 Bag Policy
-                  </button>
-                  <button 
-                    onClick={() => handleSendFanMessage("Is Gate B open?")}
-                    className="whitespace-nowrap px-2.5 py-1 rounded-full bg-white/5 border border-pitch-border text-[9px] font-medium hover:bg-white/10 hover:border-gray-400 transition-all text-gray-300"
-                  >
-                    🚪 Gate B Flow
-                  </button>
-                </div>
-
-                {/* Chat Input form */}
-                <div className="p-3 border-t border-pitch-border bg-slate-950/90 rounded-b-2xl flex items-center gap-2">
-                  <input 
-                    type="text" 
-                    placeholder="Ask Copilot (English, Spanish, French...)"
-                    value={chatInput}
-                    onChange={(e) => setChatInput(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && handleSendFanMessage()}
-                    className="flex-1 bg-slate-900 border border-pitch-border rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-pitch-emerald text-gray-100 placeholder:text-gray-500"
-                  />
-                  <button 
-                    onClick={() => handleSendFanMessage()}
-                    className="p-2 bg-pitch-emerald text-black rounded-xl hover:bg-pitch-emerald/90 transition-all shadow-md flex items-center justify-center"
-                    aria-label="Send message"
-                  >
-                    <Send className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-
-            </div>
+            <FanDashboard
+              currentUser={currentUser!}
+              fanChat={fanChat}
+              chatInput={chatInput}
+              setChatInput={setChatInput}
+              isChatTyping={isChatTyping}
+              handleSendFanMessage={handleSendFanMessage}
+              handleTriggerQuickNavigation={handleTriggerQuickNavigation}
+              chatEndRef={chatEndRef}
+            />
           )}
 
           {/* ========================================================================= */}
           {/* 2. VOLUNTEER VIEW */}
           {/* ========================================================================= */}
           {role === 'volunteer' && (
-            <div className="flex flex-col gap-6 fade-in">
-              
-              {/* Volunteer Identity selector */}
-              <div className="glass-panel p-4 rounded-xl flex items-center justify-between">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-full bg-blue-900 flex items-center justify-center font-bold text-xs text-blue-300">
-                    <UserIcon className="w-4.5 h-4.5" />
-                  </div>
-                  <div>
-                    <span className="text-[11px] text-gray-300 uppercase font-semibold">Active Volunteer Profile</span>
-                    <select 
-                      value={selectedVolunteerId}
-                      onChange={(e) => setSelectedVolunteerId(e.target.value)}
-                      className="bg-transparent text-xs font-bold text-white focus:outline-none border-b border-pitch-border pb-0.5"
-                    >
-                      {volunteerUsers.map(v => (
-                        <option key={v.id} value={v.id} className="bg-slate-950 text-white">
-                          {v.name} ({getLanguageLabel(v.languagePref)})
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-
-                <div className="text-right">
-                  <span className="text-[10px] text-gray-400 block">Duty Location</span>
-                  <span className="text-xs font-bold text-pitch-cyan">{currentVolunteer.currentLocation.zone}</span>
-                </div>
-              </div>
-
-              {/* Task Dashboard card */}
-              <div className="glass-panel p-4 rounded-xl border border-pitch-border">
-                <h3 className="font-sporty font-bold text-xs uppercase tracking-wider mb-3 text-pitch-emerald flex items-center gap-1.5">
-                  <Activity className="w-4 h-4" /> Assigned Task
-                </h3>
-                
-                {assignedIncident ? (
-                  <div className="flex flex-col gap-3">
-                    <div className="p-3 bg-red-950/20 border border-red-900/40 rounded-lg">
-                      <div className="flex items-center justify-between mb-1.5">
-                        <span className="text-xs font-bold text-red-400 flex items-center gap-1.5">
-                          ⚠ {assignedIncident.title}
-                        </span>
-                        <span className="text-[8px] bg-red-900/50 text-red-300 px-1.5 py-0.5 rounded font-bold uppercase">
-                          {assignedIncident.severity}
-                        </span>
-                      </div>
-                      <p className="text-xs text-gray-300 leading-normal">{assignedIncident.description}</p>
-                      <p className="text-[10px] text-gray-500 mt-2">
-                        Location coordinates on map: x={assignedIncident.coordinates.x}, y={assignedIncident.coordinates.y}
-                      </p>
-                    </div>
-
-                    <div className="flex gap-2">
-                      {assignedIncident.status === 'dispatched' ? (
-                        <button 
-                          onClick={() => handleUpdateTaskStatus(assignedIncident.id, 'in_progress')}
-                          className="flex-1 bg-pitch-gold text-black py-2 rounded-lg text-xs font-bold hover:bg-pitch-gold/90 transition-all uppercase"
-                        >
-                          Mark as In Progress
-                        </button>
-                      ) : (
-                        <button 
-                          onClick={() => handleUpdateTaskStatus(assignedIncident.id, 'resolved')}
-                          className="flex-1 bg-pitch-emerald text-black py-2 rounded-lg text-xs font-bold hover:bg-pitch-emerald/90 transition-all uppercase flex items-center justify-center gap-1"
-                        >
-                          <CheckCircle className="w-4 h-4" /> Resolve Incident
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                ) : (
-                  <div className="py-6 text-center text-xs text-gray-500 border border-dashed border-pitch-border rounded-lg">
-                    ✨ Zone is clear. No incidents currently assigned.
-                  </div>
-                )}
-              </div>
-
-              {/* Q&A AI protocol search */}
-              <div className="glass-panel p-4 rounded-xl">
-                <h3 className="font-sporty font-bold text-xs uppercase tracking-wider mb-2 text-pitch-cyan flex items-center gap-1.5">
-                  <FileText className="w-4 h-4" /> Protocol Q&A Helper
-                </h3>
-                <p className="text-[10px] text-gray-400 mb-3">Ask about stadium rules, prohibited items, or evacuation routes.</p>
-                
-                <div className="flex flex-col gap-3">
-                  <div className="flex gap-1.5">
-                    <button 
-                      onClick={() => handleSendVolunteerCopilot("What items are prohibited?")}
-                      className="px-2 py-1 rounded bg-slate-900 border border-pitch-border text-[9px] hover:border-pitch-cyan hover:text-pitch-cyan text-gray-400"
-                    >
-                      🚫 Prohibited Items
-                    </button>
-                    <button 
-                      onClick={() => handleSendVolunteerCopilot("Lost child protocol?")}
-                      className="px-2 py-1 rounded bg-slate-900 border border-pitch-border text-[9px] hover:border-pitch-cyan hover:text-pitch-cyan text-gray-400"
-                    >
-                      👶 Lost Child
-                    </button>
-                  </div>
-
-                  {volunteerCopilotAns && (
-                    <div className="p-3 bg-slate-900/60 border border-pitch-border rounded-lg text-xs leading-relaxed text-gray-300">
-                      <span className="font-bold text-pitch-cyan text-[10px] block uppercase mb-1">Copilot Answer</span>
-                      {volunteerCopilotAns}
-                    </div>
-                  )}
-
-                  <div className="flex items-center gap-2">
-                    <input 
-                      type="text" 
-                      placeholder="Ask about bag rules, ticketing..."
-                      value={volunteerCopilotQ}
-                      onChange={(e) => setVolunteerCopilotQ(e.target.value)}
-                      onKeyDown={(e) => e.key === 'Enter' && handleSendVolunteerCopilot(volunteerCopilotQ)}
-                      className="flex-1 bg-slate-900 border border-pitch-border rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:border-pitch-cyan text-gray-100 placeholder:text-gray-500"
-                    />
-                    <button 
-                      onClick={() => handleSendVolunteerCopilot(volunteerCopilotQ)}
-                      className="px-3 py-1.5 bg-pitch-cyan text-black font-bold rounded-lg text-xs hover:bg-pitch-cyan/90 transition-all"
-                      disabled={isVolCopilotTyping}
-                    >
-                      Ask
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              {/* GenAI Translation & Summary Assistant */}
-              <div className="glass-panel p-4 rounded-xl border border-pitch-cyan/30 flex flex-col gap-3">
-                <h3 className="font-sporty font-bold text-xs uppercase tracking-wider text-pitch-cyan flex items-center gap-1.5">
-                  ✨ Spectator Query Translator
-                </h3>
-                <p className="text-[10px] text-gray-400">
-                  Translate queries from non-English speaking spectators (e.g., Spanish, French) instantly to coordinate assistance.
-                </p>
-
-                <div className="flex flex-col gap-3">
-                  <div className="flex items-center gap-2">
-                    <input 
-                      type="text" 
-                      placeholder="e.g., '¿Dónde está el baño más cercano?' or 'Il y a une fuite d'eau'"
-                      value={volunteerTranslateInput}
-                      onChange={(e) => setVolunteerTranslateInput(e.target.value)}
-                      onKeyDown={(e) => e.key === 'Enter' && handleTranslateMessage()}
-                      className="flex-1 bg-slate-900 border border-pitch-border rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:border-pitch-cyan text-gray-100 placeholder:text-gray-500"
-                      aria-label="Spectator query to translate"
-                    />
-                    <button 
-                      type="button"
-                      onClick={handleTranslateMessage}
-                      className="px-3 py-1.5 bg-pitch-cyan text-black font-bold rounded-lg text-xs hover:bg-pitch-cyan/90 transition-all uppercase"
-                      disabled={isTranslating}
-                    >
-                      {isTranslating ? '...' : 'Translate'}
-                    </button>
-                  </div>
-
-                  {volunteerTranslateOutput && (
-                    <div className="p-3 bg-slate-900/60 border border-pitch-border rounded-lg text-xs leading-relaxed text-gray-300">
-                      <span className="font-bold text-pitch-cyan text-[10px] block uppercase mb-1">Translation Result</span>
-                      {volunteerTranslateOutput}
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Reporting Incident Form */}
-              <form onSubmit={handleReportIncident} className="glass-panel p-4 rounded-xl border border-pitch-border flex flex-col gap-3">
-                <h3 className="font-sporty font-bold text-xs uppercase tracking-wider text-pitch-error flex items-center gap-1.5">
-                  <AlertTriangle className="w-4 h-4" /> Report Stadium Incident
-                </h3>
-                
-                <div>
-                  <label className="block text-[9px] font-semibold text-gray-400 uppercase mb-1">What did you observe?</label>
-                  <textarea 
-                    rows={2}
-                    placeholder="Describe incident in natural language. e.g., 'A spectator fainted in Sec 104' or 'Water spill near Gate 4'"
-                    value={volunteerReportText}
-                    onChange={(e) => setVolunteerReportText(e.target.value)}
-                    className="w-full bg-slate-900 border border-pitch-border rounded-lg p-2.5 text-xs focus:outline-none focus:border-pitch-error text-gray-100 placeholder:text-gray-500 resize-none"
-                    required
-                  />
-                </div>
-
-                <button 
-                  type="submit" 
-                  disabled={isSubmittingReport}
-                  className="bg-pitch-error text-white py-2 rounded-lg text-xs font-bold hover:bg-red-700 transition-all uppercase flex items-center justify-center gap-1.5"
-                >
-                  {isSubmittingReport ? 'Parsing Incident...' : 'Submit AI Report'}
-                </button>
-              </form>
-
-            </div>
+            <VolunteerDashboard
+              volunteerUsers={volunteerUsers}
+              selectedVolunteerId={selectedVolunteerId}
+              setSelectedVolunteerId={setSelectedVolunteerId}
+              currentVolunteer={currentVolunteer!}
+              assignedIncident={assignedIncident || null}
+              handleUpdateTaskStatus={handleUpdateTaskStatus}
+              volunteerCopilotAns={volunteerCopilotAns}
+              volunteerCopilotQ={volunteerCopilotQ}
+              setVolunteerCopilotQ={setVolunteerCopilotQ}
+              handleSendVolunteerCopilot={handleSendVolunteerCopilot}
+              isVolCopilotTyping={isVolCopilotTyping}
+              volunteerTranslateInput={volunteerTranslateInput}
+              setVolunteerTranslateInput={setVolunteerTranslateInput}
+              handleTranslateMessage={handleTranslateMessage}
+              isTranslating={isTranslating}
+              volunteerTranslateOutput={volunteerTranslateOutput}
+              handleReportIncident={handleReportIncident}
+              volunteerReportText={volunteerReportText}
+              setVolunteerReportText={setVolunteerReportText}
+              isSubmittingReport={isSubmittingReport}
+            />
           )}
 
-          {/* ========================================================================= */}
-          {/* 3. ORGANIZER VIEW (CONTROL ROOM) */}
-          {/* ========================================================================= */}
           {role === 'organizer' && (
-            <div className="flex flex-col gap-6 fade-in">
-              
-              {/* GenAI Operations Advisor Widget */}
-              <div className="glass-panel p-4 rounded-xl border border-pitch-emerald/30 shadow-[0_0_15px_rgba(16,185,129,0.1)] flex flex-col gap-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className="w-6 h-6 rounded-full bg-pitch-emerald/20 flex items-center justify-center text-pitch-emerald text-xs">
-                      ✨
-                    </div>
-                    <h3 className="font-sporty font-bold text-xs uppercase tracking-wider text-pitch-emerald">GenAI Operations Advisor</h3>
-                  </div>
-                  <button
-                    onClick={handleGenerateAIAdvice}
-                    disabled={isAdvisorLoading}
-                    className={`px-3 py-1 bg-pitch-emerald text-black text-[11px] font-bold rounded-lg hover:bg-pitch-emerald/90 transition-all uppercase ${isAdvisorLoading ? 'animate-pulse opacity-60' : ''}`}
-                    aria-label="Generate AI Advice"
-                  >
-                    {isAdvisorLoading ? 'Analyzing...' : 'Generate Advice'}
-                  </button>
-                </div>
-                <div className="bg-slate-950/60 rounded-lg p-3 border border-pitch-border/50 text-xs text-gray-200 leading-relaxed whitespace-pre-line">
-                  {advisorRecommendation}
-                </div>
-              </div>
-
-              {/* Analytics metrics grid */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="glass-panel p-3.5 rounded-xl flex items-center justify-between">
-                  <div>
-                    <span className="text-xs text-gray-300 block uppercase font-bold">Incidents Logged</span>
-                    <span className="text-xl font-extrabold font-sporty text-pitch-emerald">{incidents.length}</span>
-                  </div>
-                  <AlertTriangle className="w-8 h-8 text-pitch-gold opacity-30" />
-                </div>
-
-                <div className="glass-panel p-3.5 rounded-xl flex items-center justify-between">
-                  <div>
-                    <span className="text-xs text-gray-300 block uppercase font-bold">Unresolved Logs</span>
-                    <span className="text-xl font-extrabold font-sporty text-pitch-error">
-                      {unresolvedIncidentsCount}
-                    </span>
-                  </div>
-                  <ShieldAlert className="w-8 h-8 text-pitch-error opacity-30" />
-                </div>
-
-                <div className="glass-panel p-3.5 rounded-xl flex items-center justify-between">
-                  <div>
-                    <span className="text-xs text-gray-300 block uppercase font-bold">Avg Wait Time</span>
-                    <span className="text-xl font-extrabold font-sporty text-pitch-cyan">
-                      {averageFacilityWaitTime}m
-                    </span>
-                  </div>
-                  <Clock className="w-8 h-8 text-pitch-cyan opacity-30" />
-                </div>
-
-                <div className="glass-panel p-3.5 rounded-xl flex items-center justify-between">
-                  <div>
-                    <span className="text-xs text-gray-300 block uppercase font-bold">Active Staff</span>
-                    <span className="text-xl font-extrabold font-sporty text-white">
-                      {activeVolunteersCount}
-                    </span>
-                  </div>
-                  <Users className="w-8 h-8 text-white opacity-30" />
-                </div>
-              </div>
-
-              {/* Incidents Ticker */}
-              <div className="glass-panel p-4 rounded-xl flex flex-col gap-3">
-                <h3 className="font-sporty font-bold text-xs uppercase tracking-wider text-pitch-emerald">Live Incident Queue</h3>
-                
-                <div className="max-h-[220px] overflow-y-auto flex flex-col gap-2 pr-1">
-                  {incidents.length > 0 ? (
-                    incidents.map((inc) => {
-                      const isSec = inc.category === 'security';
-                      const isMed = inc.category === 'medical';
-                      const color = isMed ? 'border-red-900/60 bg-red-950/10' : isSec ? 'border-amber-900/60 bg-amber-950/10' : 'border-pitch-border bg-slate-900/40';
-                      
-                      return (
-                        <div 
-                          key={inc.id} 
-                          className={`p-2.5 rounded-lg border flex items-center justify-between gap-3 text-xs ${color}`}
-                        >
-                          <div className="min-w-0 flex-1">
-                            <div className="flex items-center gap-1.5 mb-0.5">
-                              <span className="font-bold truncate text-[11px]">{inc.title}</span>
-                              <span className={`text-[8px] font-extrabold uppercase px-1.5 py-0.2 rounded ${inc.severity === 'critical' ? 'bg-red-600 text-white' : inc.severity === 'high' ? 'bg-orange-600 text-white' : 'bg-yellow-600 text-black'}`}>
-                                {inc.severity}
-                              </span>
-                            </div>
-                            <p className="text-gray-400 text-[10px] truncate">{inc.description}</p>
-                            <span className="text-[8px] text-gray-500">
-                              Status: <span className="uppercase text-gray-300 font-bold">{inc.status}</span>
-                            </span>
-                          </div>
-
-                          <div className="flex flex-col gap-1 items-end">
-                            {inc.status === 'pending' ? (
-                              <button 
-                                onClick={() => handleAutoDispatch(inc.id)}
-                                className="bg-pitch-emerald text-black text-[9px] font-bold px-2 py-1 rounded hover:bg-pitch-emerald/90 transition-all uppercase"
-                              >
-                                Auto Assign
-                              </button>
-                            ) : inc.status !== 'resolved' ? (
-                              <span className="text-[9px] text-gray-400 bg-slate-800 px-2 py-1 rounded border border-pitch-border font-medium">
-                                Assigned: {users.find(u => u.id === inc.assignedToId)?.name.split(' ')[0]}
-                              </span>
-                            ) : (
-                              <span className="text-[9px] text-pitch-emerald font-bold flex items-center gap-0.5">
-                                ✓ Resolved
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })
-                  ) : (
-                    <div className="text-center text-gray-500 py-6 text-xs border border-dashed border-pitch-border rounded-lg">
-                      No stadium incidents logged yet.
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Chart statistics */}
-              <div className="glass-panel p-4 rounded-xl flex flex-col gap-4">
-                <h3 className="font-sporty font-bold text-xs uppercase tracking-wider text-pitch-cyan flex items-center gap-1">
-                  <TrendingUp className="w-4 h-4" /> Live Traffic & Flow rate
-                </h3>
-
-                <div className="h-[140px] w-full text-xs">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={gateChartData} margin={{ top: 5, right: 5, left: -25, bottom: 5 }}>
-                      <XAxis dataKey="name" stroke="#6B7280" fontSize={10} />
-                      <YAxis stroke="#6B7280" fontSize={10} />
-                      <ChartTooltip 
-                        contentStyle={{ background: '#0D1117', borderColor: 'rgba(255,255,255,0.08)' }} 
-                        labelClassName="text-white"
-                      />
-                      <Bar dataKey="flow" fill="#06B6D4" radius={[4, 4, 0, 0]}>
-                        {gateChartData.map((entry, index) => {
-                          const color = entry.status === 'congested' ? '#F59E0B' : '#10B981';
-                          return <Cell key={`cell-${index}`} fill={color} />;
-                        })}
-                      </Bar>
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
-
-            </div>
+            <OrganizerDashboard
+              handleGenerateAIAdvice={handleGenerateAIAdvice}
+              isAdvisorLoading={isAdvisorLoading}
+              advisorRecommendation={advisorRecommendation}
+              incidents={incidents}
+              unresolvedIncidentsCount={unresolvedIncidentsCount}
+              averageFacilityWaitTime={averageFacilityWaitTime}
+              activeVolunteersCount={activeVolunteersCount}
+              handleAutoDispatch={handleAutoDispatch}
+              users={users}
+              gateChartData={gateChartData}
+            />
           )}
 
         </section>
 
       </main>
 
-      {/* --- Footer Details --- */}
-      <footer className="mt-8 text-center text-xs text-gray-500 border-t border-pitch-border/30 pt-4 px-4 w-full">
-        <p className="font-sporty tracking-wide">ArenaOS Smart Stadium Operations Dashboard • FIFA World Cup 2026 Sandbox</p>
-        <p className="text-[10px] text-gray-600 mt-1">Designed by Antigravity AI Code Companion for Vedhavya Vadite.</p>
-      </footer>
+      <Footer />
     </div>
   );
 }
